@@ -1,0 +1,48 @@
+{
+  "name": "@mobile-next/appium-mcp",
+  "version": "0.0.6",
+  "description": "Appium MCP",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mobile-next/appium-mcp.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "watch": "tsc --watch",
+    "clean": "rm -rf lib"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.6.1",
+    "commander": "^13.1.0",
+    "webdriverio": "^9.12.2",
+    "zod-to-json-schema": "^3.24.4"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.2.0",
+    "@eslint/js": "^9.19.0",
+    "@stylistic/eslint-plugin": "^3.0.1",
+    "@types/node": "^22.13.10",
+    "@typescript-eslint/eslint-plugin": "^8.26.1",
+    "@typescript-eslint/parser": "^8.26.1",
+    "@typescript-eslint/utils": "^8.26.1",
+    "eslint": "^9.19.0",
+    "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-notice": "^1.0.0",
+    "typescript": "^5.8.2"
+  },
+  "bin": {
+    "mcp-server-appium": "cli.js"
+  }
+}
