@@ -1,7 +1,7 @@
 ## Mobile Next - MCP server for Appium Mobile Automation - Empowering Next Generation of Mobile Automation
 
 This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that provides mobile automation capabilities using [Appium](https://github.com/appium). 
-This server allows LLMs to interact with native iOS and Android applications through structured accessibility snapshots or coordinate-based taps based on screenshots. 
+This server allows Agents and LLMs to interact with native iOS and Android applications through structured accessibility snapshots or coordinate-based taps based on screenshots. 
 By operating on accessibility data, it eliminates the need for traditional, visually-tuned (pixel-based) models—though a Vision Mode is also supported for coordinate-based interactions when needed.
 
 <p align="center">
@@ -10,20 +10,22 @@ By operating on accessibility data, it eliminates the need for traditional, visu
     </a>
 </p>
 
-### Main use cases - how we help to automate at scale
+### Main use cases
 
-- Native app automation (iOS and Android) for testing or data-entry scenarios. 
-- Scripted flows and form interactions without manually controlling simulators/emulators or physical devices (iPhone, Samsung, Google Pixel etc)
-- Automating multi-step user journeys driven by an LLM
-- General-purpose mobile application interaction for agent-based frameworks
-- Enables agent-to-agent communication for mobile automation usecases, data extraction
+How we help to scale mobile automation:
+
+- 📲 Native app automation (iOS and Android) for testing or data-entry scenarios. 
+- 📝 Scripted flows and form interactions without manually controlling simulators/emulators or physical devices (iPhone, Samsung, Google Pixel etc)
+- 🧭 Automating multi-step user journeys driven by an LLM
+- 👆 General-purpose mobile application interaction for agent-based frameworks
+- 🤖 Enables agent-to-agent communication for mobile automation usecases, data extraction
 
 ### Main Features
 
-- **Fast and lightweight**: Uses native accessibility trees for most interactions, or screenshot based coordinates where a11y labels are not available. 
-- **LLM-friendly**: No computer vision model required in Accessibility (Snapshot) Mode—coordinates are only needed when explicitly using Vision Mode.
-- **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
-- **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
+- 🚀 **Fast and lightweight**: Uses native accessibility trees for most interactions, or screenshot based coordinates where a11y labels are not available. 
+- 🤖 **LLM-friendly**: No computer vision model required in Accessibility (Snapshot) Mode—coordinates are only needed when explicitly using Vision Mode.
+- 📊 **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
+- 📺 **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
 
 ### Example config for initilisation
 
