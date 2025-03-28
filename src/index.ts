@@ -53,6 +53,21 @@ server.tool(
 	}
 );
 
+const resolveLaunchableActivity = async (packageName: string): Promise<string> => {
+	const result1 = execSync(`adb shell cmd package resolve-activity ${packageName}`)
+		.toString()
+		.split("\n")
+		.map(line => line.trim())
+		.filter(line => line.startsWith("name="))
+		.map(line => line.substring("name=".length));
+
+	if (result1.length !== 1) {
+		throw new Error(`Error launching app: ${packageName}, got too many entries with 'name': ${result1.join(",")}`);
+	}
+
+	return result1[0];
+}
+
 server.tool(
 	"launch-app",
 	"Launch an app on mobile device",
@@ -63,22 +78,9 @@ server.tool(
 		log(`gilm launching packageName: "${packageName}"`);
 		try {
 			// FIXME: use appium or monkey for this
-			const result1 = execSync(`adb shell cmd package resolve-activity ${packageName}`)
-				.toString()
-				.split("\n")
-				.map(line => line.trim())
-				.filter(line => line.startsWith("name="))
-				.map(line => line.substring("name=".length));
-
-			if (result1.length !== 1) {
-				return {
-					content: [{ type: 'text', text: `Error launching app: ${packageName}, got too many entries with 'name': ${result1.join(",")}` }],
-					isError: true
-				};
-			}
-
-			log(`gilm: starting activity: ${packageName}, ${result1[0]}`);
-			await driver.startActivity(packageName, result1[0]);
+			const activity = await resolveLaunchableActivity(packageName);
+			log(`gilm: starting activity: ${packageName}, ${activity}`);
+			await driver.startActivity(packageName, activity);
 
 			return {
 				content: [{ type: 'text', text: `Successfully launched app ${packageName}` }]
@@ -257,6 +259,19 @@ server.tool(
 				content: [{ type: 'text', text: `Failed to type text: ${text}` }],
 				isError: true,
 			}
+		}
+	}
+);
+
+server.tool(
+	'take-app-screenshot',
+	'Take a screenshot of the screen of the mobile device',
+	{},
+	async ({}) => {
+		log(`gilm: taking app screenshot`);
+		const screenshot64 = await driver.takeScreenshot();
+		return {
+			content: [{ type: 'image', data: screenshot64, mimeType: 'image/png' }]
 		}
 	}
 );
