@@ -6,7 +6,7 @@ By operating on accessibility data, it eliminates the need for traditional, visu
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
-        <img alt="mobile-mcp" src="https://github.com/mobile-next/appium-mcp/images/mobile-mcp.png" width="600">
+        <img alt="mobile-mcp" src="https://github.com/mobile-next/appium-mcp/blob/main/mobile-mcp.png?raw=true" width="600">
     </a>
 </p>
 
