@@ -1,4 +1,4 @@
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
@@ -86,8 +86,34 @@ server.tool(
 				content: [{ type: 'text', text: `Successfully launched app ${packageName}` }]
 			};
 		} catch (error: any) {
+			log(`gilm: error: ${JSON.stringify(error.stack)}`);
 			return {
 				content: [{ type: 'text', text: `Error launching settings app: ${error.message}` }],
+				isError: true
+			};
+		}
+	}
+);
+
+server.tool(
+	"click-on-screen-at-coordinates",
+	"Click on the screen at given x,y coordinates",
+	{
+		x: z.number().describe("The x coordinate to click"),
+		y: z.number().describe("The y coordinate to click"),
+	},
+	async ({ x, y }) => {
+		log(`gilm: clicking on screen at coordinates: ${x}, ${y}`);
+		try {
+			execSync(`adb shell input tap ${x} ${y}`);
+
+			return {
+				content: [{ type: 'text', text: `Successfully clicked on screen at coordinates: ${x}, ${y}` }]
+			};
+		} catch (error: any) {
+			log(`gilm: error: ${JSON.stringify(error.stack)}`);
+			return {
+				content: [{ type: 'text', text: `Failed to click on screen at coordinates: ${x}, ${y}` }],
 				isError: true
 			};
 		}
@@ -103,9 +129,6 @@ server.tool(
 	async ({ text }) => {
 		log(`gilm: clicking: ${text}`);
 		try {
-
-			// const screenshot = await driver.takeScreenshot();
-			// writeFileSync('/tmp/screenshot.png', screenshot);
 			const element = await driver.$(`//*[contains(@text, "${text}")]`);
 			log(`gilm: found element: ${JSON.stringify(element)}`);
 
@@ -244,7 +267,7 @@ server.tool(
 	'type-text',
 	'Type text into an element',
 	{
-		text: z.string().describe("The text to type"),
+		text: z.string().describe('The text to type'),
 	},
 	async ({ text }) => {
 		log(`gilm: typing text: ${text}`);
@@ -253,12 +276,12 @@ server.tool(
 			await driver.keys(text);
 			return {
 				content: [{ type: 'text', text: `Successfully typed text: ${text}` }]
-			}
+			};
 		} catch (error: any) {
 			return {
 				content: [{ type: 'text', text: `Failed to type text: ${text}` }],
 				isError: true,
-			}
+			};
 		}
 	}
 );
@@ -268,10 +291,19 @@ server.tool(
 	'Take a screenshot of the screen of the mobile device',
 	{},
 	async ({}) => {
-		log(`gilm: taking app screenshot`);
-		const screenshot64 = await driver.takeScreenshot();
-		return {
-			content: [{ type: 'image', data: screenshot64, mimeType: 'image/png' }]
+		try {
+			log(`gilm: taking app screenshot`);
+			const screenshot64 = await driver.takeScreenshot();
+			writeFileSync('/tmp/screenshot.png', screenshot64);
+			return {
+				content: [{ type: 'image', data: screenshot64, mimeType: 'image/png' }]
+			};
+		} catch (error: any) {
+			log(`gilm: error: ${JSON.stringify(error.stack)}`);
+			return {
+				content: [{ type: 'text', text: `Failed to take app screenshot` }],
+				isError: true,
+			};
 		}
 	}
 );
