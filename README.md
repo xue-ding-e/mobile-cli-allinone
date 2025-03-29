@@ -1,14 +1,20 @@
-## Mobile Next - MCP server for Appium Mobile Automation - Empowering Next Generation of Mobile Automation
+## Mobile Next - MCP server for Mobile Automation
 
-This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that provides mobile automation capabilities using [Appium](https://github.com/appium). 
-This server allows Agents and LLMs to interact with native iOS and Android applications through structured accessibility snapshots or coordinate-based taps based on screenshots. 
-By operating on accessibility data, it eliminates the need for traditional, visually-tuned (pixel-based) models—though a Vision Mode is also supported for coordinate-based interactions when needed.
+This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that provides mobile automation capabilities powered by [Appium](https://github.com/appium). 
+This server allows Agents and LLMs to interact with native iOS/Android applications and devices through structured accessibility snapshots or coordinate-based taps based on screenshots. 
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
         <img alt="mobile-mcp" src="https://github.com/mobile-next/appium-mcp/blob/main/mobile-mcp.png?raw=true" width="600">
     </a>
 </p>
+
+### 🚀 Mobile MCP Roadmap: Building the Future of Mobile
+
+Join us on our journey as we continuously enhance Mobile MCP! 
+Check out our detailed roadmap to see upcoming features, improvements, and milestones. Your feedback is invaluable in shaping the future of mobile automation.
+
+👉 [Explore the Roadmap](https://github.com/orgs/mobile-next/projects/1)
 
 ### Main use cases
 
@@ -52,15 +58,17 @@ When launched, Appium MCP can connect to:
 Make sure you have your mobile platform SDKs (Xcode, Android SDK) installed and configured properly before running Mobile Next Appium MCP.
 
 
-### Running in “headless” mode (no physical device)
+### Running in "headless" mode on Simulators/Emulators
 
 When you do not have an actual phone connected, you can run Mobile Next Appium MCP with an emulator or simulator in the background.
 
 For example, on Android:
 	1.	Start an emulator (avdmanager / emulator command).
-	2.	Run Appium MCP with the desired flags (see below for adding --snapshot or --vision mode).
+	2.	Run Appium MCP with the desired flags
 
-On iOS, you’ll need Xcode and to run the Simulator before using Appium MCP with that simulator instance.
+On iOS, you'll need Xcode and to run the Simulator before using Appium MCP with that simulator instance.
+`xcrun simctl list`
+`xcrun simctl boot "iPhone 16"`
 
 
 ### Snapshot Mode Tools
@@ -75,17 +83,17 @@ These tools use accessibility-based element references on iOS or Android. By rel
 ## mobile_launch_app
 - **Description:** Launches the specified app on the device/emulator
 - **Parameters:**
-  - `bundleId` (string): The application’s unique bundle/package identifier like: com.google.android.keep	 or com.apple.mobilenotes )
+  - `bundleId` (string): The application's unique bundle/package identifier like: com.google.android.keep	 or com.apple.mobilenotes )
 
 ## mobile_terminate_app
 - **Description:** Terminates a running application
 - **Parameters:**
-  - `bundleId` (string): The application’s bundle/package identifier
+  - `bundleId` (string): The application's bundle/package identifier
 
 ## mobile_element_tap
 - **Description:** Taps on a UI element identified by accessibility locator
 - **Parameters:**
-  - `element` (string): Human-readable element description (e.g., “Login button”)
+  - `element` (string): Human-readable element description (e.g., "Login button")
   - `ref` (string): Accessibility/automation ID or reference from a snapshot
 
 ## mobile_element_send_keys
@@ -140,12 +148,12 @@ These tools rely on screenshots and screen coordinates for automation. Use this 
 ## mobile_launch_app
 - **Description:** Launches the specified app on the device/emulator
 - **Parameters:**
-  - `bundleId` (string): The application’s unique bundle/package identifier
+  - `bundleId` (string): The application's unique bundle/package identifier
 
 ## mobile_terminate_app
 - **Description:** Terminates a running application
 - **Parameters:**
-  - `bundleId` (string): The application’s bundle/package identifier
+  - `bundleId` (string): The application's bundle/package identifier
 
 ## mobile_take_screenshot
 - **Description:** Captures a screenshot of the current device screen
