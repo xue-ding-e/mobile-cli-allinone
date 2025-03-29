@@ -25,3 +25,19 @@ export const getConnectedDevices = (): Simulator[] => {
                 })
                 .filter(line => line !== null);
 }
+
+export const getScreenshot = (simulatorUuid: string): Buffer => {
+        return execSync(`xcrun simctl io "${simulatorUuid}" screenshot -`);
+}
+
+export const openUrl = (simulatorUuid: string, url: string) => {
+        return execSync(`xcrun simctl openurl "${simulatorUuid}" "${url}"`);
+}
+
+export const launchApp = (simulatorUuid: string, packageName: string) => {
+        return execSync(`xcrun simctl launch "${simulatorUuid}" "${packageName}"`);
+}
+
+export const listApps = (simulatorUuid: string) => {
+        return execSync(`xcrun simctl list apps "${simulatorUuid}"`);
+}
