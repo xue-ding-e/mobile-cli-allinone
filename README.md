@@ -33,8 +33,10 @@ How we help to scale mobile automation:
 - 📊 **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
 - 📺 **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
 
+### Mobile MCP Architecture
+
 <p align="center">
-    <a href="https://github.com/mobile-next/">
+    <a href="/images/mobile-mcp-arch.png">
         <img alt="mobile-mcp" src="/images/mobile-mcp-arch.png" width="600">
     </a>
 </p>
