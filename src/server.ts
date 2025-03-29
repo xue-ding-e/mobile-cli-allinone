@@ -6,7 +6,7 @@ import { execSync } from 'child_process';
 import { remote } from 'webdriverio';
 import { trace } from './logger';
 import { z, ZodRawShape, ZodTypeAny } from "zod";
-import { resolveLaunchableActivities } from './android';
+import { getElementCoordinates, getScreenSize, resolveLaunchableActivities } from './android';
 
 enum APPIUM_SERVER_STATE {
         STOPPED,
@@ -140,12 +140,13 @@ export const createMcpServer = (): McpServer => {
         );
 
         tool(
-                "click-element",
-                "Click on an element on device",
+                "find-element-on-screen",
+                "Find coordinates of an element on device by text",
                 {
-                        text: z.string().describe("Text of the element to click"),
+                        text: z.string().describe("Text of the element to find"),
                 },
                 async ({ text }) => {
+                        /*
                         const element = await driver.$(`//*[contains(@text, "${text}")]`);
 
                         if (!element) {
@@ -154,7 +155,9 @@ export const createMcpServer = (): McpServer => {
                         }
 
                         await element.click();
-                        return `Clicked on element with text "${text}"`;
+                        */
+                        const coordinates = getElementCoordinates(text);
+                        return `Found element with text "${text}" at coordinates: ${coordinates.x},${coordinates.y}`;
                 }
         );
 
@@ -185,25 +188,12 @@ export const createMcpServer = (): McpServer => {
                 "Swipe down on the screen",
                 {},
                 async ({}) => {
-                        const screenSize = await driver.getWindowSize();
-                        const centerX = screenSize.width / 2;
-                        const y0 = screenSize.height * 0.90;
-                        const y1 = screenSize.height * 0.10;
+                        const screenSize = getScreenSize();
+                        const centerX = screenSize[0] / 2;
+                        const y0 = screenSize[1] * 0.90;
+                        const y1 = screenSize[1] * 0.10;
 
-                        await driver.performActions([{
-                                type: 'pointer',
-                                id: 'finger1',
-                                parameters: { pointerType: 'touch' },
-                                actions: [
-                                        { type: 'pointerMove', duration: 0, x: centerX, y: y1 }, // start point
-                                        { type: 'pointerDown', button: 0 },
-                                        { type: 'pause', duration: 100 },
-                                        { type: 'pointerMove', duration: 500, x: centerX, y: y0 }, // swipe up
-                                        { type: 'pointerUp', button: 0 }
-                                ]
-                        }]);
-
-                        await driver.releaseActions();
+                        execSync(`adb shell input swipe ${centerX} ${y1} ${centerX} ${y0} 250`);
                         return `Swiped down on screen`;
                 }
         );
@@ -246,7 +236,7 @@ export const createMcpServer = (): McpServer => {
                 async ({}) => {
                         try {
                                 const screenshot = execSync(`adb exec-out screencap -p`);
-                                writeFileSync('/tmp/screenshot.png', screenshot);
+                                // debug: writeFileSync('/tmp/screenshot.png', screenshot);
                                 
                                 const screenshot64 = screenshot.toString('base64');
                                 trace(`Screenshot taken: ${screenshot.length} bytes`);
