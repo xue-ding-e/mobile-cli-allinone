@@ -5,7 +5,7 @@ This server allows Agents and LLMs to interact with native iOS/Android applicati
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
-        <img alt="mobile-mcp" src="https://github.com/mobile-next/appium-mcp/blob/main/mobile-mcp.png?raw=true" width="600">
+        <img alt="mobile-mcp" src="/images/mobile-mcp.png" width="600">
     </a>
 </p>
 
@@ -32,6 +32,12 @@ How we help to scale mobile automation:
 - 🤖 **LLM-friendly**: No computer vision model required in Accessibility (Snapshot) Mode—coordinates are only needed when explicitly using Vision Mode.
 - 📊 **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
 - 📺 **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
+
+<p align="center">
+    <a href="https://github.com/mobile-next/">
+        <img alt="mobile-mcp" src="/images/mobile-mcp-arch.png" width="600">
+    </a>
+</p>
 
 ### Example config for initilisation
 
