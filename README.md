@@ -29,7 +29,8 @@ How we help to scale mobile automation:
 ### Main Features
 
 - 🚀 **Fast and lightweight**: Uses native accessibility trees for most interactions, or screenshot based coordinates where a11y labels are not available. 
-- 🤖 **LLM-friendly**: No computer vision model required in Accessibility (Snapshot) Mode—coordinates are only needed when explicitly using Vision Mode.
+- 🤖 **LLM-friendly**: No computer vision model required in Accessibility (Snapshot).
+- 🧿 **Visual Sense**: Evaluates and analyses what’s actually rendered on screen to decide the next action. If accessibility data or view-hierarchy coordinates are unavailable, it falls back to screenshot-based analysis.
 - 📊 **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
 - 📺 **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
 
@@ -79,7 +80,7 @@ On iOS, you'll need Xcode and to run the Simulator before using Appium MCP with 
 `xcrun simctl boot "iPhone 16"`
 
 
-### Snapshot Mode Tools
+# Mobile Commands and interaction tools
 
 These tools use accessibility-based element references on iOS or Android. By relying on the accessibility/automation IDs, you avoid the ambiguity of coordinate-based approaches.
 
@@ -104,6 +105,12 @@ These tools use accessibility-based element references on iOS or Android. By rel
   - `element` (string): Human-readable element description (e.g., "Login button")
   - `ref` (string): Accessibility/automation ID or reference from a snapshot
 
+## mobile_tap
+- **Description:** Taps on specified screen coordinates
+- **Parameters:**
+  - `x` (number): X-coordinate
+  - `y` (number): Y-coordinate
+
 ## mobile_element_send_keys
 - **Description:** Types text into a UI element (e.g., TextField)
 - **Parameters:**
@@ -119,6 +126,14 @@ These tools use accessibility-based element references on iOS or Android. By rel
   - `startRef` (string): Accessibility/automation ID of the start element
   - `endElement` (string): Human-readable description of the end element
   - `endRef` (string): Accessibility/automation ID of the end element
+ 
+## mobile_swipe
+- **Description:** Performs a swipe gesture between two sets of screen coordinates
+- **Parameters:**
+  - `startX` (number): Start X-coordinate
+  - `startY` (number): Start Y-coordinate
+  - `endX` (number): End X-coordinate
+  - `endY` (number): End Y-coordinate
 
 ## mobile_press_key
 - **Description:** Presses hardware keys or triggers special events (e.g., back button on Android)
@@ -144,59 +159,3 @@ These tools use accessibility-based element references on iOS or Android. By rel
 - **Parameters:** None
 
 
-# Vision Mode Tools
-
-These tools rely on screenshots and screen coordinates for automation. Use this approach if accessibility references are unavailable or insufficient.
-
-## mobile_install_app
-- **Description:** Installs an app onto the device/emulator
-- **Parameters:**
-  - `appPath` (string): Path or URL to the app file
-
-## mobile_launch_app
-- **Description:** Launches the specified app on the device/emulator
-- **Parameters:**
-  - `bundleId` (string): The application's unique bundle/package identifier
-
-## mobile_terminate_app
-- **Description:** Terminates a running application
-- **Parameters:**
-  - `bundleId` (string): The application's bundle/package identifier
-
-## mobile_take_screenshot
-- **Description:** Captures a screenshot of the current device screen
-- **Parameters:** None
-
-## mobile_tap
-- **Description:** Taps on specified screen coordinates
-- **Parameters:**
-  - `x` (number): X-coordinate
-  - `y` (number): Y-coordinate
-
-## mobile_swipe
-- **Description:** Performs a swipe gesture between two sets of screen coordinates
-- **Parameters:**
-  - `startX` (number): Start X-coordinate
-  - `startY` (number): Start Y-coordinate
-  - `endX` (number): End X-coordinate
-  - `endY` (number): End Y-coordinate
-
-## mobile_type
-- **Description:** Types text at the current input focus (if supported)
-- **Parameters:**
-  - `text` (string): Text to type
-  - `submit` (boolean): Whether to press Enter/Return after typing
-
-## mobile_press_key
-- **Description:** Presses hardware keys (e.g., Android Back button, Home button)
-- **Parameters:**
-  - `key` (string): Key identifier (e.g., HOME, BACK, VOLUME_UP, etc.)
-
-## mobile_wait
-- **Description:** Waits for a specified time in seconds
-- **Parameters:**
-  - `time` (number): Time to wait in seconds (capped at 10 seconds)
-
-## mobile_close_session
-- **Description:** Closes the current Appium session
-- **Parameters:** None
