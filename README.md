@@ -26,7 +26,7 @@ How we help to scale mobile automation:
 - 👆 General-purpose mobile application interaction for agent-based frameworks
 - 🤖 Enables agent-to-agent communication for mobile automation usecases, data extraction
 
-### Main Features
+## Main Features
 
 - 🚀 **Fast and lightweight**: Uses native accessibility trees for most interactions, or screenshot based coordinates where a11y labels are not available. 
 - 🤖 **LLM-friendly**: No computer vision model required in Accessibility (Snapshot).
@@ -34,7 +34,7 @@ How we help to scale mobile automation:
 - 📊 **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
 - 📺 **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
 
-### Mobile MCP Architecture
+## Mobile MCP Architecture
 
 <p align="center">
     <a href="/images/mobile-mcp-arch.png">
@@ -42,7 +42,9 @@ How we help to scale mobile automation:
     </a>
 </p>
 
-### Example config for initilisation
+
+
+## How to install
 
 ```js
 {
@@ -56,6 +58,15 @@ How we help to scale mobile automation:
   }
 }
 ```
+
+## Prerequisites
+
+What you will need to connect MCP with your agent and mobile devices:
+
+- [Xcode command line tools](https://developer.apple.com/xcode/resources/)
+- [Android Platform Tools](https://developer.android.com/tools/releases/platform-tools)
+- [node.js](https://nodejs.org/en/download/)
+- MCP supported foundational models or agents, like [Claude MCP](https://modelcontextprotocol.io/quickstart/server), [OpenAI Agent SDK](https://openai.github.io/openai-agents-python/mcp/), [Copilot Studio](https://www.microsoft.com/en-us/microsoft-copilot/blog/copilot-studio/introducing-model-context-protocol-mcp-in-copilot-studio-simplified-integration-with-ai-apps-and-agents/)
 
 ### Simulators, Emulators, and Physical Devices
 
