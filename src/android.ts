@@ -45,57 +45,8 @@ export const getScreenSize = (): [number, number] => {
 	return [width, height];
 };
 
-export const getElementCoordinates = (text: string): ElementCoordinates => {
-	const dump = execSync(`adb exec-out uiautomator dump /dev/tty`);
-
-	const parser = new xml.XMLParser({
-		ignoreAttributes: false,
-		attributeNamePrefix: ""
-	});
-
-	const parsedXml = parser.parse(dump);
-	const hierarchy = parsedXml.hierarchy;
-
-	// Function to recursively search for text elements in the UI hierarchy
-	const findTextElement = (node: any): any => {
-		// Base case: if node is null or undefined
-		if (!node) {
-			return null;
-		}
-
-		// Check if current node has the text we're looking for
-		if (node.text && node.text.includes(text)) {
-			return node;
-		}
-
-		// If node has a "node" property
-		if (node.node) {
-			// If node.node is an array, search in each element
-			if (Array.isArray(node.node)) {
-				for (const childNode of node.node) {
-					const result = findTextElement(childNode);
-					if (result) {
-						return result;
-					}
-				}
-			} else {
-				// if node.node is an object, recurse on it
-				const result = findTextElement(node.node);
-				if (result) {
-					return result;
-				}
-			}
-		}
-
-		return null;
-	};
-
-	const textElement = findTextElement(hierarchy);
-
-	if (!textElement) {
-		console.log(`Element with text "${text}" not found`);
-		throw new Error(`Element with text "${text}" was not found on screen`);
-	}
+const collectElements = (node: any, screenSize: [number, number]): any[] => {
+	const elements: any[] = [];
 
 	const getCoordinates = (element: any): Bounds => {
 		const bounds = String(element.bounds);
@@ -111,13 +62,54 @@ export const getElementCoordinates = (text: string): ElementCoordinates => {
 		};
 	};
 
-	return getCenter(getCoordinates(textElement));
-	/*
-	const jsonOutput = JSON.stringify(textElement, null, 2);
-	console.dir(jsonOutput.toString());
-	console.dir(getCoordinates(textElement));
-	console.dir(getCenter(getCoordinates(textElement)));
-	*/
+	const normalizeCoordinates = (coordinates: ElementCoordinates, screenSize: [number, number]): ElementCoordinates => {
+		return {
+			x: Number((coordinates.x / screenSize[0]).toFixed(3)),
+			y: Number((coordinates.y / screenSize[1]).toFixed(3)),
+		};
+	};
+
+	if (node.node) {
+		if (Array.isArray(node.node)) {
+			for (const childNode of node.node) {
+				elements.push(...collectElements(childNode, screenSize));
+			}
+		} else {
+			elements.push(...collectElements(node.node, screenSize));
+		}
+	}
+
+	if (node.text) {
+		elements.push({
+			"text": node.text,
+			"coordinates": normalizeCoordinates(getCenter(getCoordinates(node)), screenSize),
+		});
+	}
+
+	if (node["content-desc"]) {
+		elements.push({
+			"text": node["content-desc"],
+			"coordinates": normalizeCoordinates(getCenter(getCoordinates(node)), screenSize),
+		});
+	}
+
+	return elements;
+};
+
+export const getElementsOnScreen = (): any[] => {
+	const dump = execSync(`adb exec-out uiautomator dump /dev/tty`);
+
+	const parser = new xml.XMLParser({
+		ignoreAttributes: false,
+		attributeNamePrefix: ""
+	});
+
+	const parsedXml = parser.parse(dump);
+	const hierarchy = parsedXml.hierarchy;
+
+	const screenSize = getScreenSize();
+	const elements = collectElements(hierarchy, screenSize);
+	return elements;
 };
 
 export const swipe = (direction: "up" | "down" | "left" | "right") => {
@@ -161,4 +153,16 @@ export const takeScreenshot = async (): Promise<Buffer> => {
 	const screenshot = readFileSync(localFilename);
 	unlinkSync(localFilename);
 	return screenshot;
+};
+
+export const listApps = (): string[] => {
+	const result = execSync(`adb shell cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.LAUNCHER`)
+		.toString()
+		.split("\n")
+		.map(line => line.trim())
+		.filter(line => line.startsWith("packageName="))
+		.map(line => line.substring("packageName=".length))
+		.filter((value, index, self) => self.indexOf(value) === index);
+
+	return result;
 };

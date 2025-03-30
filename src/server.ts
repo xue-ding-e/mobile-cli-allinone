@@ -4,7 +4,7 @@ import { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { execSync } from "child_process";
 import { error, trace } from "./logger";
 import { z, ZodRawShape, ZodTypeAny } from "zod";
-import { getElementCoordinates, getScreenSize, swipe, takeScreenshot } from "./android";
+import { getElementsOnScreen, getScreenSize, listApps, swipe, takeScreenshot } from "./android";
 
 import sharp from "sharp";
 
@@ -50,12 +50,15 @@ export const createMcpServer = (): McpServer => {
 		"List all apps on device",
 		{},
 		async ({}) => {
+			/*
 			const result = execSync(`adb shell pm list packages`)
 				.toString()
 				.split("\n")
 				.filter(line => line.startsWith("package:"))
 				.map(line => line.substring("package:".length));
+			*/
 
+			const result = listApps();
 			return `Found these packages on device: ${result.join(",")}`;
 		}
 	);
@@ -99,17 +102,13 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"find-element-on-screen",
-		"Find coordinates of an element on device by text",
+		"list-elements-on-screen",
+		"List elements on screen and their coordinates, based on text or accessibility label",
 		{
-			text: z.string().describe("Text of the element to find"),
 		},
-		async ({ text }) => {
-			const coordinates = getElementCoordinates(text);
-			const screenSize = getScreenSize();
-			const x = coordinates.x / screenSize[0];
-			const y = coordinates.y / screenSize[1];
-			return `Found element with text "${text}" at coordinates: ${x},${y}`;
+		async ({}) => {
+			const elements = getElementsOnScreen();
+			return `Found these elements on screen: ${JSON.stringify(elements)}`;
 		}
 	);
 
