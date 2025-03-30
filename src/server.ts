@@ -16,7 +16,7 @@ const getAgentVersion = (): string => {
 export const createMcpServer = (): McpServer => {
 
 	const server = new McpServer({
-		name: "appium-mcp",
+		name: "mobile-mcp",
 		version: getAgentVersion(),
 		capabilities: {
 			resources: {},
