@@ -55,6 +55,19 @@ How we help to scale mobile automation:
 
 ## How to install
 
+```json
+{
+  "mcpServers": {
+    "mobile-mcp": {
+      "command": "npx",
+      "args": ["-y", "@mobilenext/mobile-mcp@latest"]
+    }
+  }
+}
+
+```
+
+[From Claude Code:](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)
 ```
 claude mcp add mobile -- npx -y @mobilenext/mobile-mcp@latest ⁠
 ```
