@@ -1,7 +1,9 @@
 ## Mobile Next - MCP server for Mobile Automation
 
-This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that provides mobile automation capabilities powered by [Appium](https://github.com/appium). 
+This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that enables scalable mobile automation through a platform-agnostic interface, eliminating the need for distinct iOS or Android knowledge.
 This server allows Agents and LLMs to interact with native iOS/Android applications and devices through structured accessibility snapshots or coordinate-based taps based on screenshots. 
+
+
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
@@ -52,7 +54,7 @@ How we help to scale mobile automation:
     "mobile-next": {
       "command": "npx",
       "args": [
-        "@mobile-next/appium-mcp@latest"
+        "@mobilenext/mobile-mcp@latest"
       ]
     }
   }
