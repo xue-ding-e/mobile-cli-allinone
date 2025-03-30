@@ -72,23 +72,23 @@ What you will need to connect MCP with your agent and mobile devices:
 
 ### Simulators, Emulators, and Physical Devices
 
-When launched, Appium MCP can connect to:
+When launched, Mobile MCP can connect to:
 	•	iOS Simulators on macOS/Linux
 	•	Android Emulators on Linux/Windows/macOS
 	•	Physical iOS or Android devices (requires proper platform tools and drivers)
 
-Make sure you have your mobile platform SDKs (Xcode, Android SDK) installed and configured properly before running Mobile Next Appium MCP.
+Make sure you have your mobile platform SDKs (Xcode, Android SDK) installed and configured properly before running Mobile Next Mobile MCP.
 
 
 ### Running in "headless" mode on Simulators/Emulators
 
-When you do not have an actual phone connected, you can run Mobile Next Appium MCP with an emulator or simulator in the background.
+When you do not have an actual phone connected, you can run Mobile Next Mobile MCP with an emulator or simulator in the background.
 
 For example, on Android:
 	1.	Start an emulator (avdmanager / emulator command).
-	2.	Run Appium MCP with the desired flags
+	2.	Run Mobile MCP with the desired flags
 
-On iOS, you'll need Xcode and to run the Simulator before using Appium MCP with that simulator instance.
+On iOS, you'll need Xcode and to run the Simulator before using Mobile MCP with that simulator instance.
 `xcrun simctl list`
 `xcrun simctl boot "iPhone 16"`
 
@@ -168,7 +168,7 @@ These tools use accessibility-based element references on iOS or Android. By rel
   - `time` (number): Time to wait in seconds (capped at 10 seconds)
 
 ## mobile_close_session
-- **Description:** Closes the current Appium session
+- **Description:** Closes the current device session
 - **Parameters:** None
 
 
