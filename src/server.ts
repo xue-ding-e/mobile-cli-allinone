@@ -50,14 +50,6 @@ export const createMcpServer = (): McpServer => {
 		"List all apps on device",
 		{},
 		async ({}) => {
-			/*
-			const result = execSync(`adb shell pm list packages`)
-				.toString()
-				.split("\n")
-				.filter(line => line.startsWith("package:"))
-				.map(line => line.substring("package:".length));
-			*/
-
 			const result = listApps();
 			return `Found these packages on device: ${result.join(",")}`;
 		}
@@ -72,6 +64,18 @@ export const createMcpServer = (): McpServer => {
 		async ({ packageName }) => {
 			execSync(`adb shell monkey -p "${packageName}" -c android.intent.category.LAUNCHER 1`);
 			return `Launched app ${packageName}`;
+		}
+	);
+
+	tool(
+		"terminate_app",
+		"Stop and terminate an app on mobile device",
+		{
+			packageName: z.string().describe("The package name of the app to terminate"),
+		},
+		async ({ packageName }) => {
+			execSync(`adb shell am force-stop "${packageName}"`);
+			return `Terminated app ${packageName}`;
 		}
 	);
 
@@ -103,7 +107,7 @@ export const createMcpServer = (): McpServer => {
 
 	tool(
 		"list_elements_on_screen",
-		"List elements on screen and their coordinates, based on text or accessibility label",
+		"List elements on screen and their coordinates, with display text or accessibility label. Do not cache this result.",
 		{
 		},
 		async ({}) => {
@@ -163,7 +167,7 @@ export const createMcpServer = (): McpServer => {
 
 	server.tool(
 		"take_device_screenshot",
-		"Take a screenshot of the mobile device",
+		"Take a screenshot of the mobile device. Use this to understand what's on screen, if you need to press an element that is available through view hierarchy then you must list elements on screen instead. Do not cache this result.",
 		{},
 		async ({}) => {
 			try {
