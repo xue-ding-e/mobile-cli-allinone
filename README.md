@@ -73,29 +73,28 @@ What you will need to connect MCP with your agent and mobile devices:
 ### Simulators, Emulators, and Physical Devices
 
 When launched, Mobile MCP can connect to:
-	•	iOS Simulators on macOS/Linux
-	•	Android Emulators on Linux/Windows/macOS
-	•	Physical iOS or Android devices (requires proper platform tools and drivers)
+- iOS Simulators on macOS/Linux
+- Android Emulators on Linux/Windows/macOS
+- Physical iOS or Android devices (requires proper platform tools and drivers)
 
 Make sure you have your mobile platform SDKs (Xcode, Android SDK) installed and configured properly before running Mobile Next Mobile MCP.
 
-
 ### Running in "headless" mode on Simulators/Emulators
 
-When you do not have an actual phone connected, you can run Mobile Next Mobile MCP with an emulator or simulator in the background.
+When you do not have a physical phone connected to your machine, you can run Mobile MCP with an emulator or simulator in the background.
 
 For example, on Android:
-	1.	Start an emulator (avdmanager / emulator command).
-	2.	Run Mobile MCP with the desired flags
+1. Start an emulator (avdmanager / emulator command).
+2. Run Mobile MCP with the desired flags
 
 On iOS, you'll need Xcode and to run the Simulator before using Mobile MCP with that simulator instance.
-`xcrun simctl list`
-`xcrun simctl boot "iPhone 16"`
+- `xcrun simctl list`
+- `xcrun simctl boot "iPhone 16"`
 
 
 # Mobile Commands and interaction tools
 
-These tools use accessibility-based element references on iOS or Android. By relying on the accessibility/automation IDs, you avoid the ambiguity of coordinate-based approaches.
+The commands and tools support both accessibility-based locators (preferred) and coordinate-based inputs, giving you flexibility when accessibility/automation IDs are missing for reliable and seemless automation.
 
 ## mobile_install_app
 - **Description:** Installs an app onto the device/emulator
