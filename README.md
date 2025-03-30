@@ -48,17 +48,8 @@ How we help to scale mobile automation:
 
 ## How to install
 
-```js
-{
-  "mcpServers": {
-    "mobile-next": {
-      "command": "npx",
-      "args": [
-        "@mobilenext/mobile-mcp@latest"
-      ]
-    }
-  }
-}
+```
+claude mcp add mobile -- npx -y @mobilenext/mobile-mcp@latest ⁠
 ```
 
 ## Prerequisites
