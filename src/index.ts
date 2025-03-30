@@ -8,7 +8,7 @@ async function main() {
 	const server = createMcpServer();
 	await server.connect(transport);
 
-	error("Appium MCP Server running on stdio");
+	error("mobile-mcp server running on stdio");
 }
 
 main().catch(err => {
