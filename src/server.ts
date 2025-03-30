@@ -139,12 +139,14 @@ export const createMcpServer = (): McpServer => {
         );
 
         tool(
-                "swipe-down-on-screen",
-                "Swipe down on the screen",
-                {},
-                async ({}) => {
-                        swipe("down");
-                        return `Swiped down on screen`;
+                "swipe-on-screen",
+                "Swipe on the screen",
+                {
+                        direction: z.enum(["up", "down"]).describe("The direction to swipe"),
+                },
+                async ({ direction }) => {
+                        swipe(direction);
+                        return `Swiped ${direction} on screen`;
                 }
         );
 

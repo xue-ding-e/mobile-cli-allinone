@@ -122,16 +122,29 @@ export const getElementCoordinates = (text: string): ElementCoordinates => {
 }
 
 export const swipe = (direction: "up" | "down" | "left" | "right") => {
-	if (direction !== "down") {
-		throw new Error(`Swipe direction "${direction}" is not supported`);
-	}
 
 	const screenSize = getScreenSize();
-	const center = screenSize[0] / 2;
-	const y0 = screenSize[1] * 0.10;
-	const y1 = screenSize[1] * 0.90;
+	const centerX = screenSize[0] >> 1;
+	const centerY = screenSize[1] >> 1;
 
-	execSync(`adb shell input swipe ${center} ${y1} ${center} ${y0} 1000`);
+	let x0, y0, x1, y1: number;
+
+	switch (direction) {
+		case "down":
+			x0 = x1 = centerX;
+			y0 = Math.floor(screenSize[1] * 0.80);
+			y1 = Math.floor(screenSize[1] * 0.20);
+			break;
+		case "up":
+			x0 = x1 = centerX;
+			y0 = Math.floor(screenSize[1] * 0.20);
+			y1 = Math.floor(screenSize[1] * 0.80);
+			break;
+		default:
+			throw new Error(`Swipe direction "${direction}" is not supported`);
+	}
+
+	execSync(`adb shell input swipe ${x0} ${y0} ${x1} ${y1} 1000`);
 }
 
 export const takeScreenshot = async (): Promise<Buffer> => {
