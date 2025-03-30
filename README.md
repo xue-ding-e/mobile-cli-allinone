@@ -114,6 +114,11 @@ The commands and tools support both accessibility-based locators (preferred) and
 - **Parameters:**
   - `appPath` (string): Path or URL to the app file (e.g., .apk for Android, .ipa/.app for iOS)
 
+## mobile_list_apps
+- **Description:** List all the installed apps on the device
+- **Parameters:**
+  - `bundleId` (string): The application's unique bundle/package identifier like: com.google.android.keep	 or com.apple.mobilenotes )
+
 ## mobile_launch_app
 - **Description:** Launches the specified app on the device/emulator
 - **Parameters:**
@@ -122,7 +127,21 @@ The commands and tools support both accessibility-based locators (preferred) and
 ## mobile_terminate_app
 - **Description:** Terminates a running application
 - **Parameters:**
-  - `bundleId` (string): The application's bundle/package identifier
+  - `packageName` (string): Based on the application's bundle/package identifier calls am force stop or kills the app based on pid.
+ 
+## mobile_get_screen_size
+- **Description:** Get the screen size of the mobile device in pixels
+- **Parameters:** None
+
+## mobile_click_on_screen_at_coordinates
+- **Description:** Taps on specified screen coordinates based on coordinates. 
+- **Parameters:**
+  - `x` (number): X-coordinate
+  - `y` (number): Y-coordinate
+ 
+## mobile_list_elements_on_screen
+- **Description:** List elements on screen and their coordinates, with display text or accessibility label.
+- **Parameters:** None
 
 ## mobile_element_tap
 - **Description:** Taps on a UI element identified by accessibility locator
@@ -135,9 +154,18 @@ The commands and tools support both accessibility-based locators (preferred) and
 - **Parameters:**
   - `x` (number): X-coordinate
   - `y` (number): Y-coordinate
+ 
+## mobile_press_button
+- **Description:** Press a button on device (home, back, volume, enter, power button.)
+- **Parameters:** None
 
-## mobile_element_send_keys
-- **Description:** Types text into a UI element (e.g., TextField)
+## mobile_open_url
+- **Description:** Open a URL in browser on device
+- **Parameters:**
+  - `url` (string): The URL to be opened (e.g., "https://example.com").
+
+## mobile_type_text
+- **Description:** Types text into a focused UI element (e.g., TextField, SearchField)
 - **Parameters:**
   - `element` (string): Human-readable element description
   - `ref` (string): Accessibility/automation ID of the element
