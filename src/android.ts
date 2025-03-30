@@ -1,5 +1,6 @@
 import { exec, execSync } from "child_process";
 import * as xml from "fast-xml-parser";
+import { readFileSync, unlinkSync } from "fs";
 
 interface Bounds {
 	left: number;
@@ -134,6 +135,18 @@ export const swipe = (direction: "up" | "down" | "left" | "right") => {
 }
 
 export const takeScreenshot = async (): Promise<Buffer> => {
-	const screenshot = execSync(`adb exec-out screencap -p`);
+	const randomFilename = `screenshot-${Date.now()}.png`;
+
+	// take screenshot and save on device
+	const remoteFilename = `/sdcard/Download/${randomFilename}`;
+	execSync(`adb shell screencap -p ${remoteFilename}`);
+
+	// pull the file locally
+	const localFilename = `/tmp/${randomFilename}`;
+	execSync(`adb pull ${remoteFilename} ${localFilename}`);
+	execSync(`adb shell rm ${remoteFilename}`);
+
+	const screenshot = readFileSync(localFilename);
+	unlinkSync(localFilename);
 	return screenshot;
 }
