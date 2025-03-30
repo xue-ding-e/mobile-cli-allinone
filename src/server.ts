@@ -1,17 +1,16 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types';
 
-import { readFileSync, writeFileSync } from 'fs';
+import { writeFileSync } from 'fs';
 import { execSync } from 'child_process';
-import { trace } from './logger';
+import { error, trace } from './logger';
 import { z, ZodRawShape, ZodTypeAny } from "zod";
 import { getElementCoordinates, getScreenSize, resolveLaunchableActivities, swipe, takeScreenshot } from './android';
 
 import sharp from 'sharp';
 
 const getAgentVersion = (): string => {
-        const text = readFileSync('./package.json');
-        const json = JSON.parse(text.toString());
+        const json = require('../package.json');
         return json.version;
 }
 
@@ -29,9 +28,9 @@ export const createMcpServer = (): McpServer => {
         const tool = (name: string, description: string, paramsSchema: ZodRawShape, cb: (args: z.objectOutputType<ZodRawShape, ZodTypeAny>) => Promise<string>) => {
                 const wrappedCb = async (args: ZodRawShape): Promise<CallToolResult> => {
                         try {
-                                trace(`Invoking tool: ${description}`);
+                                trace(`Invoking ${name} with args: ${JSON.stringify(args)}`);
                                 const response = await cb(args);
-                                trace(`Tool '${description}' returned: ${response}`);
+                                trace(`=> ${response}`);
                                 return {
                                         content: [{ type: 'text', text: response }],
                                 };
@@ -75,17 +74,27 @@ export const createMcpServer = (): McpServer => {
         );
 
         tool(
+                "get-screen-size",
+                "Get the screen size of the mobile device in pixels",
+                {},
+                async ({}) => {
+                        const screenSize = getScreenSize();
+                        return `Screen size is ${screenSize[0]}x${screenSize[1]} pixels`;
+                }
+        );
+
+        tool(
                 "click-on-screen-at-coordinates",
                 "Click on the screen at given x,y coordinates",
                 {
-                        x: z.number().describe("The x coordinate to click"),
-                        y: z.number().describe("The y coordinate to click"),
+                        x: z.number().describe("The x coordinate to click between 0 and 1"),
+                        y: z.number().describe("The y coordinate to click between 0 and 1"),
                 },
                 async ({ x, y }) => {
-                        // FIXME: consider scale
-                        x *= 2;
-                        y *= 2;
-                        execSync(`adb shell input tap ${x} ${y}`);
+                        const screenSize = getScreenSize();
+                        const x0 = Math.floor(screenSize[0] * x);
+                        const y0 = Math.floor(screenSize[1] * y);
+                        execSync(`adb shell input tap ${x0} ${y0}`);
                         return `Clicked on screen at coordinates: ${x}, ${y}`;
                 }
         );
@@ -97,28 +106,23 @@ export const createMcpServer = (): McpServer => {
                         text: z.string().describe("Text of the element to find"),
                 },
                 async ({ text }) => {
-                        /*
-                        const element = await driver.$(`//*[contains(@text, "${text}")]`);
-
-                        if (!element) {
-                                trace("Element not found on screen");
-                                throw new Error(`Element with text "${text}" not found`);
-                        }
-
-                        await element.click();
-                        */
                         const coordinates = getElementCoordinates(text);
-                        return `Found element with text "${text}" at coordinates: ${coordinates.x},${coordinates.y}`;
+                        const screenSize = getScreenSize();
+                        const x = coordinates.x / screenSize[0];
+                        const y = coordinates.y / screenSize[1];
+                        return `Found element with text "${text}" at coordinates: ${x},${y}`;
                 }
         );
 
         tool(
-                "press-back-button",
-                "Press the back button on device",
-                {},
-                async ({}) => {
-                        execSync(`adb shell input keyevent 4`);
-                        return `Pressed the back button`;
+                "press-button",
+                "Press a button on device",
+                {
+                        button: z.string().describe("The button to press. Supported buttons: KEYCODE_BACK, KEYCODE_HOME, KEYCODE_MENU, KEYCODE_VOLUME_UP, KEYCODE_VOLUME_DOWN, KEYCODE_ENTER"),
+                },
+                async ({ button }) => {
+                        execSync(`adb shell input keyevent ${button}`);
+                        return `Pressed the button: ${button}`;
                 }
         );
 
@@ -186,7 +190,7 @@ export const createMcpServer = (): McpServer => {
         );
 
         server.tool(
-                'take-app-screenshot',
+                'take-device-screenshot',
                 'Take a screenshot of the mobile device',
                 {},
                 async ({}) => {
@@ -205,9 +209,9 @@ export const createMcpServer = (): McpServer => {
                                         .jpeg({ quality: 75 })
                                         .toBuffer();
 
-                                // Use the resized screenshot instead of the original
-                                writeFileSync('/tmp/screenshot.png', screenshot);
-                                writeFileSync('/tmp/screenshot-scaled.jpg', resizedScreenshot);
+                                // debug:
+                                // writeFileSync('/tmp/screenshot.png', screenshot);
+                                // writeFileSync('/tmp/screenshot-scaled.jpg', resizedScreenshot);
 
                                 const screenshot64 = resizedScreenshot.toString('base64');
                                 trace(`Screenshot taken: ${screenshot.length} bytes`);
@@ -215,10 +219,10 @@ export const createMcpServer = (): McpServer => {
                                 return {
                                         content: [{ type: 'image', data: screenshot64, mimeType: 'image/jpeg' }]
                                 };
-                        } catch (error: any) {
-                                error(`Error taking screenshot: ${error.message} ${error.stack}`);
+                        } catch (err: any) {
+                                error(`Error taking screenshot: ${err.message} ${err.stack}`);
                                 return {
-                                        content: [{ type: 'text', text: `Error: ${error.message}` }],
+                                        content: [{ type: 'text', text: `Error: ${err.message}` }],
                                         isError: true,
                                 };
                         }
