@@ -46,7 +46,7 @@ export const createMcpServer = (): McpServer => {
 	};
 
 	tool(
-		"list-apps-on-device",
+		"list_apps_on_device",
 		"List all apps on device",
 		{},
 		async ({}) => {
@@ -64,7 +64,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"launch-app",
+		"launch_app",
 		"Launch an app on mobile device",
 		{
 			packageName: z.string().describe("The package name of the app to launch"),
@@ -76,7 +76,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"get-screen-size",
+		"get_screen_size",
 		"Get the screen size of the mobile device in pixels",
 		{},
 		async ({}) => {
@@ -86,7 +86,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"click-on-screen-at-coordinates",
+		"click_on_screen_at_coordinates",
 		"Click on the screen at given x,y coordinates",
 		{
 			x: z.number().describe("The x coordinate to click between 0 and 1"),
@@ -102,7 +102,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"list-elements-on-screen",
+		"list_elements_on_screen",
 		"List elements on screen and their coordinates, based on text or accessibility label",
 		{
 		},
@@ -113,7 +113,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"press-button",
+		"press_button",
 		"Press a button on device",
 		{
 			button: z.string().describe("The button to press. Supported buttons: KEYCODE_BACK, KEYCODE_HOME, KEYCODE_MENU, KEYCODE_VOLUME_UP, KEYCODE_VOLUME_DOWN, KEYCODE_ENTER"),
@@ -125,7 +125,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"open-url",
+		"open_url",
 		"Open a URL in browser on device",
 		{
 			url: z.string().describe("The URL to open"),
@@ -137,7 +137,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"swipe-on-screen",
+		"swipe_on_screen",
 		"Swipe on the screen",
 		{
 			direction: z.enum(["up", "down"]).describe("The direction to swipe"),
@@ -149,7 +149,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"type-text",
+		"type_text",
 		"Type text into the focused element",
 		{
 			text: z.string().describe("The text to type"),
@@ -162,7 +162,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	server.tool(
-		"take-device-screenshot",
+		"take_device_screenshot",
 		"Take a screenshot of the mobile device",
 		{},
 		async ({}) => {
