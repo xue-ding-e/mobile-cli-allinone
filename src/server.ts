@@ -149,35 +149,6 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"swipe-down-until-element-is-visible",
-		"Swipe down on the screen until an element is visible",
-		{
-			text: z.string().describe("The text of the element to swipe down until"),
-		},
-		async ({ text }) => {
-			let found = false;
-			for (let i = 0; i < 10; i++) {
-				try {
-					getElementCoordinates(text);
-
-					// element is visible on screen, break
-					found = true;
-					break;
-				} catch (error: any) {
-					trace(`Element with text "${text}" not found on screen, retrying...`);
-					swipe("down");
-				}
-			}
-
-			if (!found) {
-				throw new Error(`Element with text "${text}" not found on screen after scrolling down 10 times`);
-			}
-
-			return `Swiped down on screen until element is visible: ${text}`;
-		}
-	);
-
-	tool(
 		"type-text",
 		"Type text into the focused element",
 		{
