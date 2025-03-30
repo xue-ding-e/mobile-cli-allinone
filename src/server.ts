@@ -1,46 +1,13 @@
-import { McpServer, ToolCallback } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolResult } from '@modelcontextprotocol/sdk/types';
 
-import { appendFileSync, readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { execSync } from 'child_process';
-import { remote } from 'webdriverio';
 import { trace } from './logger';
 import { z, ZodRawShape, ZodTypeAny } from "zod";
-import { getElementCoordinates, getScreenSize, resolveLaunchableActivities } from './android';
+import { getElementCoordinates, getScreenSize, resolveLaunchableActivities, swipe, takeScreenshot } from './android';
 
-enum APPIUM_SERVER_STATE {
-        STOPPED,
-        STARTING,
-        STARTED,
-        STOPPING,
-}
-
-let appiumServerState: APPIUM_SERVER_STATE = APPIUM_SERVER_STATE.STOPPED;
-
-const isSimulatorRunning = () => {
-}
-
-const createAppiumDriver = async (): Promise<WebdriverIO.Browser> => {
-
-        const capabilities = {
-                platformName: 'Android',
-                'appium:automationName': 'UiAutomator2',
-        };
-
-        const wdOpts = {
-                hostname: process.env.APPIUM_HOST || 'localhost',
-                port: parseInt(process.env.APPIUM_PORT || "4723", 10) || 4723,
-                capabilities,
-        };
-
-        trace("Connecting to Appium server with capabilities: " + JSON.stringify(capabilities));
-        const driver = await remote(wdOpts);
-        trace("Connected to Appium server with driver: " + JSON.stringify(driver));
-
-        return driver;
-};
-
-let driver: WebdriverIO.Browser;
+import sharp from 'sharp';
 
 const getAgentVersion = (): string => {
         const text = readFileSync('./package.json');
@@ -49,14 +16,6 @@ const getAgentVersion = (): string => {
 }
 
 export const createMcpServer = (): McpServer => {
-
-        let driver: WebdriverIO.Browser;
-
-        appiumServerState = APPIUM_SERVER_STATE.STARTING;
-        createAppiumDriver().then((d) => {
-                driver = d;
-                appiumServerState = APPIUM_SERVER_STATE.STARTED;
-        });
 
         const server = new McpServer({
                 name: "appium-mcp",
@@ -77,7 +36,7 @@ export const createMcpServer = (): McpServer => {
                                         content: [{ type: 'text', text: response }],
                                 };
                         } catch (error: any) {
-                                trace(`Tool '${description}' failed: ${error.message}`);
+                                trace(`Tool '${description}' failed: ${error.message} stack: ${error.stack}`);
                                 return {
                                         content: [{ type: 'text', text: `Error: ${error.message}` }],
                                         isError: true,
@@ -110,18 +69,7 @@ export const createMcpServer = (): McpServer => {
                         packageName: z.string().describe("The package name of the app to launch"),
                 },
                 async ({ packageName }) => {
-                        const activities = await resolveLaunchableActivities(packageName);
-                        trace(`Found launchable activities: ${activities.join(",")}`);
-
-                        if (activities.length === 0) {
-                                throw new Error(`No launchable activities found for package ${packageName}`);
-                        }
-
-                        if (activities.length > 1) {
-                                trace(`Found multiple launchable activities for package ${packageName}, please specify the activity to launch from this list: ${activities.join(",")}`);
-                        }
-
-                        execSync(`adb shell am start -n ${packageName}/${activities[0]}`);
+                        execSync(`adb shell monkey -p "${packageName}" -c android.intent.category.LAUNCHER 1`);
                         return `Launched app ${packageName}`;
                 }
         );
@@ -134,6 +82,9 @@ export const createMcpServer = (): McpServer => {
                         y: z.number().describe("The y coordinate to click"),
                 },
                 async ({ x, y }) => {
+                        // FIXME: consider scale
+                        x *= 2;
+                        y *= 2;
                         execSync(`adb shell input tap ${x} ${y}`);
                         return `Clicked on screen at coordinates: ${x}, ${y}`;
                 }
@@ -188,12 +139,7 @@ export const createMcpServer = (): McpServer => {
                 "Swipe down on the screen",
                 {},
                 async ({}) => {
-                        const screenSize = getScreenSize();
-                        const centerX = screenSize[0] / 2;
-                        const y0 = screenSize[1] * 0.90;
-                        const y1 = screenSize[1] * 0.10;
-
-                        execSync(`adb shell input swipe ${centerX} ${y1} ${centerX} ${y0} 250`);
+                        swipe("down");
                         return `Swiped down on screen`;
                 }
         );
@@ -205,12 +151,22 @@ export const createMcpServer = (): McpServer => {
                         text: z.string().describe("The text of the element to swipe down until"),
                 },
                 async ({ text }) => {
-                        await driver.swipe({
-                                direction: 'down',
-                                duration: 1500,
-                                percent: 0.90, // Using 90% of the screen to avoid triggering OS features
-                                scrollableElement: await driver.$(`//*[contains(@text, "${text}")]`),
-                        });
+                        let found = false;
+                        for (let i = 0; i < 10; i++) {
+                                try {
+                                        const coordinates = getElementCoordinates(text);
+                                        // element is visible on screen, break
+                                        found = true;
+                                        break;
+                                } catch (error: any) {
+                                        trace(`Element with text "${text}" not found on screen, retrying...`);
+                                        swipe("down");
+                                }
+                        }
+
+                        if (!found) {
+                                throw new Error(`Element with text "${text}" not found on screen after scrolling down 10 times`);
+                        }
 
                         return `Swiped down on screen until element is visible: ${text}`;
                 }
@@ -235,14 +191,29 @@ export const createMcpServer = (): McpServer => {
                 {},
                 async ({}) => {
                         try {
-                                const screenshot = execSync(`adb exec-out screencap -p`);
-                                // debug: writeFileSync('/tmp/screenshot.png', screenshot);
-                                
-                                const screenshot64 = screenshot.toString('base64');
+                                const screenshot = await takeScreenshot();
+
+                                // Scale down the screenshot by 50%
+                                const image = sharp(screenshot);
+                                const metadata = await image.metadata();
+                                if (!metadata.width) {
+                                        throw new Error("Failed to get screenshot metadata");
+                                }
+
+                                const resizedScreenshot = await image
+                                        .resize(Math.floor(metadata.width / 2))
+                                        .jpeg({ quality: 75 })
+                                        .toBuffer();
+
+                                // Use the resized screenshot instead of the original
+                                writeFileSync('/tmp/screenshot.png', screenshot);
+                                writeFileSync('/tmp/screenshot-scaled.jpg', resizedScreenshot);
+
+                                const screenshot64 = resizedScreenshot.toString('base64');
                                 trace(`Screenshot taken: ${screenshot.length} bytes`);
 
                                 return {
-                                        content: [{ type: 'image', data: screenshot64, mimeType: 'image/png' }]
+                                        content: [{ type: 'image', data: screenshot64, mimeType: 'image/jpeg' }]
                                 };
                         } catch (error: any) {
                                 error(`Error taking screenshot: ${error.message} ${error.stack}`);
