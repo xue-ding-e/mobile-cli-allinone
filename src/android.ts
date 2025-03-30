@@ -119,3 +119,21 @@ export const getElementCoordinates = (text: string): ElementCoordinates => {
 	console.dir(getCenter(getCoordinates(textElement)));
 	*/
 }
+
+export const swipe = (direction: "up" | "down" | "left" | "right") => {
+	if (direction !== "down") {
+		throw new Error(`Swipe direction "${direction}" is not supported`);
+	}
+
+	const screenSize = getScreenSize();
+	const center = screenSize[0] / 2;
+	const y0 = screenSize[1] * 0.10;
+	const y1 = screenSize[1] * 0.90;
+
+	execSync(`adb shell input swipe ${center} ${y1} ${center} ${y0} 1000`);
+}
+
+export const takeScreenshot = async (): Promise<Buffer> => {
+	const screenshot = execSync(`adb exec-out screencap -p`);
+	return screenshot;
+}
