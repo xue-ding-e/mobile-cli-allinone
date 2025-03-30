@@ -25,9 +25,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
-    "commander": "^13.1.0",
     "fast-xml-parser": "^5.0.9",
-    "webdriverio": "^9.12.2",
+    "sharp": "^0.33.5",
     "zod-to-json-schema": "^3.24.4"
   },
   "devDependencies": {
