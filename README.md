@@ -7,7 +7,7 @@ This server allows Agents and LLMs to interact with native iOS/Android applicati
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
-        <img alt="mobile-mcp" src="https://github.com/mobile-next/mobile-next-assets/blob/main/mobile-mcp-banner.png?raw=true" width="600">
+        <img alt="mobile-mcp" src="https://raw.githubusercontent.com/mobile-next/mobile-next-assets/refs/heads/main/mobile-mcp-banner.png" width="600">
     </a>
 </p>
 
@@ -39,8 +39,8 @@ How we help to scale mobile automation:
 ## Mobile MCP Architecture
 
 <p align="center">
-    <a href="/images/mobile-mcp-arch.png">
-        <img alt="mobile-mcp" src="https://github.com/mobile-next/mobile-next-assets/blob/main/mobile-mcp-arch.png?raw=true" width="600">
+    <a href="https://raw.githubusercontent.com/mobile-next/mobile-next-assets/refs/heads/main/mobile-mcp-arch.png">
+        <img alt="mobile-mcp" src="https://raw.githubusercontent.com/mobile-next/mobile-next-assets/refs/heads/main/mobile-mcp-arch.png" width="600">
     </a>
 </p>
 
