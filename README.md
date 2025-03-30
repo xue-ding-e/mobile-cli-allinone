@@ -3,7 +3,14 @@
 This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that enables scalable mobile automation through a platform-agnostic interface, eliminating the need for distinct iOS or Android knowledge.
 This server allows Agents and LLMs to interact with native iOS/Android applications and devices through structured accessibility snapshots or coordinate-based taps based on screenshots. 
 
-
+<p align="center">
+  <a href="https://www.npmjs.com/package/@mobilenext/mobile-mcp">
+    <img src="https://img.shields.io/badge/npm-@mobilenext/mobile--mcp-red" alt="npm">
+  </a>
+  <a href="https://github.com/mobile-next/mobile-mcp">
+    <img src="https://img.shields.io/badge/github-repo-black" alt="GitHub repo">
+  </a>
+</p>
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
