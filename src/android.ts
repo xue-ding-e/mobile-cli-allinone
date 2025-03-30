@@ -1,4 +1,4 @@
-import { exec, execSync } from "child_process";
+import { execSync } from "child_process";
 import * as xml from "fast-xml-parser";
 import { readFileSync, unlinkSync } from "fs";
 
@@ -12,14 +12,14 @@ interface Bounds {
 interface ElementCoordinates {
 	x: number,
 	y: number;
-};
+}
 
 export const getConnectedDevices = (): string[] => {
 	return execSync(`adb devices`)
 		.toString()
 		.split("\n")
 		.filter(line => !line.startsWith("List of devices attached"))
-		.filter(line => line.trim() != "");
+		.filter(line => line.trim() !== "");
 };
 
 export const resolveLaunchableActivities = (packageName: string): string[] => {
@@ -29,10 +29,10 @@ export const resolveLaunchableActivities = (packageName: string): string[] => {
 		.map(line => line.trim())
 		.filter(line => line.startsWith("name="))
 		.map(line => line.substring("name=".length));
-}
+};
 
 export const getScreenSize = (): [number, number] => {
-	const screenSize = execSync('adb shell wm size')
+	const screenSize = execSync("adb shell wm size")
 		.toString()
 		.split(" ")
 		.pop();
@@ -43,7 +43,7 @@ export const getScreenSize = (): [number, number] => {
 
 	const [width, height] = screenSize.split("x").map(Number);
 	return [width, height];
-}
+};
 
 export const getElementCoordinates = (text: string): ElementCoordinates => {
 	const dump = execSync(`adb exec-out uiautomator dump /dev/tty`);
@@ -78,9 +78,8 @@ export const getElementCoordinates = (text: string): ElementCoordinates => {
 						return result;
 					}
 				}
-			}
-			// If node.node is an object, recurse on it
-			else {
+			} else {
+				// if node.node is an object, recurse on it
 				const result = findTextElement(node.node);
 				if (result) {
 					return result;
@@ -100,32 +99,32 @@ export const getElementCoordinates = (text: string): ElementCoordinates => {
 
 	const getCoordinates = (element: any): Bounds => {
 		const bounds = String(element.bounds);
-		const [_, left, top, right, bottom] = bounds.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/)?.map(Number) || [];
+
+		const [, left, top, right, bottom] = bounds.match(/^\[(\d+),(\d+)\]\[(\d+),(\d+)\]$/)?.map(Number) || [];
 		return { left, top, right, bottom };
-	}
+	};
 
 	const getCenter = (coordinates: Bounds): ElementCoordinates => {
 		return {
 			x: Math.floor((coordinates.left + coordinates.right) / 2),
 			y: Math.floor((coordinates.top + coordinates.bottom) / 2),
 		};
-	}
+	};
 
 	return getCenter(getCoordinates(textElement));
-
 	/*
 	const jsonOutput = JSON.stringify(textElement, null, 2);
 	console.dir(jsonOutput.toString());
 	console.dir(getCoordinates(textElement));
 	console.dir(getCenter(getCoordinates(textElement)));
 	*/
-}
+};
 
 export const swipe = (direction: "up" | "down" | "left" | "right") => {
 
 	const screenSize = getScreenSize();
 	const centerX = screenSize[0] >> 1;
-	const centerY = screenSize[1] >> 1;
+	// const centerY = screenSize[1] >> 1;
 
 	let x0, y0, x1, y1: number;
 
@@ -145,7 +144,7 @@ export const swipe = (direction: "up" | "down" | "left" | "right") => {
 	}
 
 	execSync(`adb shell input swipe ${x0} ${y0} ${x1} ${y1} 1000`);
-}
+};
 
 export const takeScreenshot = async (): Promise<Buffer> => {
 	const randomFilename = `screenshot-${Date.now()}.png`;
@@ -162,4 +161,4 @@ export const takeScreenshot = async (): Promise<Buffer> => {
 	const screenshot = readFileSync(localFilename);
 	unlinkSync(localFilename);
 	return screenshot;
-}
+};

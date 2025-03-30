@@ -11,7 +11,7 @@ async function main() {
 	error("Appium MCP Server running on stdio");
 }
 
-main().catch((err) => {
+main().catch(err => {
 	console.error("Fatal error in main():", err);
 	error("Fatal error in main(): " + JSON.stringify(err.stack));
 	process.exit(1);
