@@ -121,12 +121,12 @@ export const swipe = (direction: "up" | "down" | "left" | "right") => {
 	let x0, y0, x1, y1: number;
 
 	switch (direction) {
-		case "down":
+		case "up":
 			x0 = x1 = centerX;
 			y0 = Math.floor(screenSize[1] * 0.80);
 			y1 = Math.floor(screenSize[1] * 0.20);
 			break;
-		case "up":
+		case "down":
 			x0 = x1 = centerX;
 			y0 = Math.floor(screenSize[1] * 0.20);
 			y1 = Math.floor(screenSize[1] * 0.80);
