@@ -46,8 +46,8 @@ export const createMcpServer = (): McpServer => {
 	};
 
 	tool(
-		"list_apps_on_device",
-		"List all apps on device",
+		"mobile_list_apps",
+		"List all the installed apps on the device",
 		{},
 		async ({}) => {
 			const result = listApps();
@@ -56,7 +56,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"launch_app",
+		"mobile_launch_app",
 		"Launch an app on mobile device",
 		{
 			packageName: z.string().describe("The package name of the app to launch"),
@@ -68,7 +68,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"terminate_app",
+		"mobile_terminate_app",
 		"Stop and terminate an app on mobile device",
 		{
 			packageName: z.string().describe("The package name of the app to terminate"),
@@ -80,7 +80,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"get_screen_size",
+		"mobile_get_screen_size",
 		"Get the screen size of the mobile device in pixels",
 		{},
 		async ({}) => {
@@ -90,7 +90,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"click_on_screen_at_coordinates",
+		"mobile_click_on_screen_at_coordinates",
 		"Click on the screen at given x,y coordinates",
 		{
 			x: z.number().describe("The x coordinate to click between 0 and 1"),
@@ -106,7 +106,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"list_elements_on_screen",
+		"mobile_list_elements_on_screen",
 		"List elements on screen and their coordinates, with display text or accessibility label. Do not cache this result.",
 		{
 		},
@@ -117,7 +117,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"press_button",
+		"mobile_press_button",
 		"Press a button on device",
 		{
 			button: z.string().describe("The button to press. Supported buttons: KEYCODE_BACK, KEYCODE_HOME, KEYCODE_MENU, KEYCODE_VOLUME_UP, KEYCODE_VOLUME_DOWN, KEYCODE_ENTER"),
@@ -129,7 +129,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"open_url",
+		"mobile_open_url",
 		"Open a URL in browser on device",
 		{
 			url: z.string().describe("The URL to open"),
@@ -153,7 +153,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	tool(
-		"type_text",
+		"mobile_type_keys",
 		"Type text into the focused element",
 		{
 			text: z.string().describe("The text to type"),
@@ -166,7 +166,7 @@ export const createMcpServer = (): McpServer => {
 	);
 
 	server.tool(
-		"take_device_screenshot",
+		"mobile_take_screenshot",
 		"Take a screenshot of the mobile device. Use this to understand what's on screen, if you need to press an element that is available through view hierarchy then you must list elements on screen instead. Do not cache this result.",
 		{},
 		async ({}) => {
