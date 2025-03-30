@@ -53,7 +53,7 @@ How we help to scale mobile automation:
 
 
 
-## How to install
+## Installation and configuration
 
 ```json
 {
@@ -66,11 +66,13 @@ How we help to scale mobile automation:
 }
 
 ```
+[Detailed guide for Claude Desktop](https://modelcontextprotocol.io/quickstart/user)
 
-[From Claude Code:](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)
+
 ```
 claude mcp add mobile -- npx -y @mobilenext/mobile-mcp@latest ⁠
 ```
+[Claude Code:](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/overview)
 
 ## Prerequisites
 
