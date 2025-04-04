@@ -1,12 +1,11 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types";
-
-import { execSync } from "child_process";
-import { error, trace } from "./logger";
 import { z, ZodRawShape, ZodTypeAny } from "zod";
-import { getElementsOnScreen, getScreenSize, listApps, swipe, takeScreenshot } from "./android";
-
 import sharp from "sharp";
+
+import { error, trace } from "./logger";
+import { AndroidRobot } from "./android";
+import { Robot } from "./robot";
 
 const getAgentVersion = (): string => {
 	const json = require("../package.json");
@@ -45,24 +44,34 @@ export const createMcpServer = (): McpServer => {
 		server.tool(name, description, paramsSchema, args => wrappedCb(args));
 	};
 
+	const robot: Robot = new AndroidRobot();
+
 	tool(
 		"mobile_list_apps",
 		"List all the installed apps on the device",
 		{},
 		async ({}) => {
-			const result = listApps();
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			const result = await robot.listApps();
 			return `Found these packages on device: ${result.join(",")}`;
 		}
 	);
 
 	tool(
 		"mobile_launch_app",
-		"Launch an app on mobile device",
+		"Launch an app on mobile device. Use this to open a specific app. You can find the package name of the app by calling list_apps_on_device.",
 		{
 			packageName: z.string().describe("The package name of the app to launch"),
 		},
 		async ({ packageName }) => {
-			execSync(`adb shell monkey -p "${packageName}" -c android.intent.category.LAUNCHER 1`);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			await robot.launchApp(packageName);
 			return `Launched app ${packageName}`;
 		}
 	);
@@ -74,7 +83,11 @@ export const createMcpServer = (): McpServer => {
 			packageName: z.string().describe("The package name of the app to terminate"),
 		},
 		async ({ packageName }) => {
-			execSync(`adb shell am force-stop "${packageName}"`);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			await robot.terminateApp(packageName);
 			return `Terminated app ${packageName}`;
 		}
 	);
@@ -84,8 +97,12 @@ export const createMcpServer = (): McpServer => {
 		"Get the screen size of the mobile device in pixels",
 		{},
 		async ({}) => {
-			const screenSize = getScreenSize();
-			return `Screen size is ${screenSize[0]}x${screenSize[1]} pixels`;
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			const screenSize = await robot.getScreenSize();
+			return `Screen size is ${screenSize.width}x${screenSize.height} pixels`;
 		}
 	);
 
@@ -97,10 +114,14 @@ export const createMcpServer = (): McpServer => {
 			y: z.number().describe("The y coordinate to click between 0 and 1"),
 		},
 		async ({ x, y }) => {
-			const screenSize = getScreenSize();
-			const x0 = Math.floor(screenSize[0] * x);
-			const y0 = Math.floor(screenSize[1] * y);
-			execSync(`adb shell input tap ${x0} ${y0}`);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			const screenSize = await robot.getScreenSize();
+			const x0 = Math.floor(screenSize.width * x);
+			const y0 = Math.floor(screenSize.height * y);
+			await robot.tap(x0, y0);
 			return `Clicked on screen at coordinates: ${x}, ${y}`;
 		}
 	);
@@ -111,8 +132,29 @@ export const createMcpServer = (): McpServer => {
 		{
 		},
 		async ({}) => {
-			const elements = getElementsOnScreen();
-			return `Found these elements on screen: ${JSON.stringify(elements)}`;
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			const screenSize = await robot.getScreenSize();
+			const elements = await robot.getElementsOnScreen();
+
+			const result = [];
+			for (let i = 0; i < elements.length; i++) {
+				elements[i].rect.x0 = elements[i].rect.x0 / screenSize.width;
+				elements[i].rect.y0 = elements[i].rect.y0 / screenSize.height;
+				elements[i].rect.x1 = elements[i].rect.x1 / screenSize.width;
+				elements[i].rect.y1 = elements[i].rect.y1 / screenSize.height;
+				result.push({
+					text: elements[i].label,
+					coordinates: {
+						x: (elements[i].rect.x0 + elements[i].rect.x1) / 2,
+						y: (elements[i].rect.y0 + elements[i].rect.y1) / 2,
+					}
+				});
+			}
+
+			return `Found these elements on screen: ${JSON.stringify(result)}`;
 		}
 	);
 
@@ -120,10 +162,14 @@ export const createMcpServer = (): McpServer => {
 		"mobile_press_button",
 		"Press a button on device",
 		{
-			button: z.string().describe("The button to press. Supported buttons: KEYCODE_BACK, KEYCODE_HOME, KEYCODE_MENU, KEYCODE_VOLUME_UP, KEYCODE_VOLUME_DOWN, KEYCODE_ENTER"),
+			button: z.string().describe("The button to press. Supported buttons: BACK, HOME, VOLUME_UP, VOLUME_DOWN, ENTER"),
 		},
 		async ({ button }) => {
-			execSync(`adb shell input keyevent ${button}`);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			robot.pressButton(button);
 			return `Pressed the button: ${button}`;
 		}
 	);
@@ -135,7 +181,11 @@ export const createMcpServer = (): McpServer => {
 			url: z.string().describe("The URL to open"),
 		},
 		async ({ url }) => {
-			execSync(`adb shell am start -a android.intent.action.VIEW -d "${url}"`);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			robot.openUrl(url);
 			return `Opened URL: ${url}`;
 		}
 	);
@@ -147,7 +197,11 @@ export const createMcpServer = (): McpServer => {
 			direction: z.enum(["up", "down"]).describe("The direction to swipe"),
 		},
 		async ({ direction }) => {
-			swipe(direction);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			robot.swipe(direction);
 			return `Swiped ${direction} on screen`;
 		}
 	);
@@ -159,8 +213,11 @@ export const createMcpServer = (): McpServer => {
 			text: z.string().describe("The text to type"),
 		},
 		async ({ text }) => {
-			const _text = text.replace(/ /g, "\\ ");
-			execSync(`adb shell input text "${_text}"`);
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
+			robot.sendKeys(text);
 			return `Typed text: ${text}`;
 		}
 	);
@@ -170,8 +227,12 @@ export const createMcpServer = (): McpServer => {
 		"Take a screenshot of the mobile device. Use this to understand what's on screen, if you need to press an element that is available through view hierarchy then you must list elements on screen instead. Do not cache this result.",
 		{},
 		async ({}) => {
+			if (!robot) {
+				throw new Error("No device selected");
+			}
+
 			try {
-				const screenshot = await takeScreenshot();
+				const screenshot = await robot.getScreenshot();
 
 				// Scale down the screenshot by 50%
 				const image = sharp(screenshot);
