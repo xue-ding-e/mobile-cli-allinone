@@ -1,4 +1,6 @@
-
+import { tmpdir } from "os";
+import { join } from "path";
+import { randomBytes } from "crypto";
 import { readFileSync, unlinkSync } from "fs";
 import { execFileSync } from "child_process";
 
@@ -69,9 +71,10 @@ export class IosRobot implements Robot {
 	}
 
 	public async getScreenshot(): Promise<Buffer> {
-		await this.ios("screenshot", "--output", "screenshot.png");
-		const buffer = readFileSync("screenshot.png");
-		unlinkSync("screenshot.png");
+		const tmpFilename = join(tmpdir(), `screenshot-${randomBytes(8).toString("hex")}.png`);
+		await this.ios("screenshot", "--output", tmpFilename);
+		const buffer = readFileSync(tmpFilename);
+		unlinkSync(tmpFilename);
 		return buffer;
 	}
 }
