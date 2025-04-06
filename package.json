@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsc && chmod +x lib/index.js",
     "lint": "eslint .",
-    "test": "mocha --require ts-node/register test/*.ts",
+    "test": "nyc mocha --require ts-node/register test/*.ts",
     "watch": "tsc --watch",
     "clean": "rm -rf lib",
     "prepare": "husky"
@@ -24,6 +24,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
     "fast-xml-parser": "^5.0.9",
+    "nyc": "^17.1.0",
     "sharp": "^0.33.5",
     "zod-to-json-schema": "^3.24.4"
   },
