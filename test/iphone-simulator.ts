@@ -24,7 +24,12 @@ describe("ios", () => {
 	});
 
 	it("should be able to get elements on screen", async () => {
+		await simctl.pressButton("HOME");
 		const elements = await simctl.getElementsOnScreen();
 		assert.ok(elements.length > 0);
+
+		// must have News app in home screen
+		const element = elements.find(e => e.type === "Icon" && e.label === "News");
+		assert.ok(element !== undefined, "should have News app in home screen");
 	}).timeout(10000);
 });
