@@ -141,18 +141,20 @@ export class WebDriverAgent {
 
 		const output: any[] = [];
 
-		if (["TextField", "Button", "Switch"].includes(source.type)) {
-			output.push({
-				type: source.type,
-				label: source.label,
-				name: source.name,
-				rect: {
-					x0: source.rect.x,
-					y0: source.rect.y,
-					x1: source.rect.x + source.rect.width,
-					y1: source.rect.y + source.rect.height,
-				},
-			});
+		if (["TextField", "Button", "Switch", "Icon", "SearchField"].includes(source.type)) {
+			if (source.label !== null || source.name !== null) {
+				output.push({
+					type: source.type,
+					label: source.label,
+					name: source.name,
+					rect: {
+						x0: source.rect.x,
+						y0: source.rect.y,
+						x1: source.rect.x + source.rect.width,
+						y1: source.rect.y + source.rect.height,
+					},
+				});
+			}
 		}
 
 		if (source.children) {
