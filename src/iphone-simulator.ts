@@ -18,9 +18,7 @@ interface AppInfo {
 	CFBundleName: string;
 	CFBundleVersion: string;
 	DataContainer: string;
-	GroupContainers: Record<string, string>;
 	Path: string;
-	SBAppTags: string[];
 }
 
 const TIMEOUT = 30000;
@@ -77,8 +75,6 @@ export class Simctl implements Robot {
 			const appContent = appMatch[2];
 
 			const appInfo: Partial<AppInfo> = {
-				GroupContainers: {},
-				SBAppTags: []
 			};
 
 			// parse simple key-value pairs
@@ -96,34 +92,6 @@ export class Simctl implements Robot {
 
 				if (key !== "GroupContainers" && key !== "SBAppTags") {
 					(appInfo as any)[key] = value;
-				}
-			}
-
-			// parse GroupContainers
-			const groupContainersMatch = appContent.match(/GroupContainers\s+=\s+\{([^}]+)\};/);
-			if (groupContainersMatch) {
-				const groupContainersContent = groupContainersMatch[1];
-				const groupRegex = /"([^"]+)"\s+=\s+"([^"]+)"/g;
-				let groupMatch;
-
-				while ((groupMatch = groupRegex.exec(groupContainersContent)) !== null) {
-					const groupId = groupMatch[1];
-					const groupPath = groupMatch[2];
-					appInfo.GroupContainers![groupId] = groupPath;
-				}
-			}
-
-			// parse SBAppTags
-			const sbAppTagsMatch = appContent.match(/SBAppTags\s+=\s+\(\s*(.*?)\s*\);/);
-			if (sbAppTagsMatch) {
-				const tagsContent = sbAppTagsMatch[1].trim();
-				if (tagsContent) {
-					const tagRegex = /"([^"]+)"/g;
-					let tagMatch;
-
-					while ((tagMatch = tagRegex.exec(tagsContent)) !== null) {
-						appInfo.SBAppTags!.push(tagMatch[1]);
-					}
 				}
 			}
 
