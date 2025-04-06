@@ -181,20 +181,19 @@ export const createMcpServer = (): McpServer => {
 			const screenSize = await robot.getScreenSize();
 			const elements = await robot.getElementsOnScreen();
 
-			const result = [];
-			for (let i = 0; i < elements.length; i++) {
-				elements[i].rect.x0 = elements[i].rect.x0 / screenSize.width;
-				elements[i].rect.y0 = elements[i].rect.y0 / screenSize.height;
-				elements[i].rect.x1 = elements[i].rect.x1 / screenSize.width;
-				elements[i].rect.y1 = elements[i].rect.y1 / screenSize.height;
-				result.push({
-					text: elements[i].label,
+			const result = elements.map(element => {
+				const x0 = element.rect.x0 / screenSize.width;
+				const y0 = element.rect.y0 / screenSize.height;
+				const x1 = element.rect.x1 / screenSize.width;
+				const y1 = element.rect.y1 / screenSize.height;
+				return {
+					text: element.label,
 					coordinates: {
-						x: (elements[i].rect.x0 + elements[i].rect.x1) / 2,
-						y: (elements[i].rect.y0 + elements[i].rect.y1) / 2,
+						x: Number((x0 + x1) / 2).toFixed(3),
+						y: Number((y0 + y1) / 2).toFixed(3),
 					}
-				});
-			}
+				};
+			});
 
 			return `Found these elements on screen: ${JSON.stringify(result)}`;
 		}
@@ -253,13 +252,19 @@ export const createMcpServer = (): McpServer => {
 		"Type text into the focused element",
 		{
 			text: z.string().describe("The text to type"),
+			submit: z.boolean().describe("Whether to submit the text. If true, the text will be submitted as if the user pressed the enter key."),
 		},
-		async ({ text }) => {
+		async ({ text, submit }) => {
 			if (!robot) {
 				throw new Error("No device selected");
 			}
 
-			robot.sendKeys(text);
+			await robot.sendKeys(text);
+
+			if (submit) {
+				await robot.pressButton("ENTER");
+			}
+
 			return `Typed text: ${text}`;
 		}
 	);
