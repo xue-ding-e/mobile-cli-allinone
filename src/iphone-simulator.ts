@@ -1,4 +1,6 @@
 import { execFileSync, execSync } from "child_process";
+
+import { WebDriverAgent } from "./webdriver-agent";
 import { Button, Dimensions, Robot, SwipeDirection } from "./robot";
 
 export interface Simulator {
@@ -6,26 +8,6 @@ export interface Simulator {
 	uuid: string;
 	state: string;
 }
-
-interface SourceTreeElement {
-	type: string;
-	label?: string;
-	name?: string;
-	rawIdentifier?: string;
-	rect: {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	};
-
-	children?: Array<SourceTreeElement>;
-}
-
-interface SourceTree {
-	value: SourceTreeElement;
-}
-
 
 interface AppInfo {
 	ApplicationType: string;
@@ -41,16 +23,26 @@ interface AppInfo {
 	SBAppTags: string[];
 }
 
+const TIMEOUT = 30000;
+const MAX_BUFFER_SIZE = 1024 * 1024 * 4;
 
 export class Simctl implements Robot {
+
+	private readonly wda: WebDriverAgent;
+
 	constructor(private readonly simulatorUuid: string) {
+		this.wda = new WebDriverAgent("localhost", 8100);
 	}
 
 	private simctl(...args: string[]): Buffer {
 		return execFileSync(
 			"xcrun",
 			["simctl", ...args],
-			{ maxBuffer: 1024 * 1024 * 4 });
+			{
+				timeout: TIMEOUT,
+				maxBuffer: MAX_BUFFER_SIZE,
+			}
+		);
 	}
 
 	public async getScreenshot(): Promise<Buffer> {
@@ -58,7 +50,8 @@ export class Simctl implements Robot {
 	}
 
 	public async openUrl(url: string) {
-		this.simctl("openurl", this.simulatorUuid, url);
+		await this.wda.openUrl(url);
+		// alternative: this.simctl("openurl", this.simulatorUuid, url);
 	}
 
 	public async launchApp(packageName: string) {
@@ -147,197 +140,27 @@ export class Simctl implements Robot {
 	}
 
 	public async getScreenSize(): Promise<Dimensions> {
-		return this.withinSession(async (port, sessionId) => {
-			const url = `http://localhost:${port}/session/${sessionId}/window/size`;
-			const response = await fetch(url);
-			const json = await response.json();
-			return {
-				width: json.value.width,
-				height: json.value.height
-			};
-		});
+		return this.wda.getScreenSize();
 	}
 
 	public async sendKeys(keys: string) {
-		await this.withinSession(async (port, sessionId) => {
-			const url = `http://localhost:${port}/session/${sessionId}/wda/keys`;
-			await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({ value: [keys] }),
-			});
-		});
+		return this.wda.sendKeys(keys);
 	}
 
 	public async swipe(direction: SwipeDirection) {
-		await this.withinSession(async (port, sessionId) => {
-
-			const x0 = 200;
-			let y0 = 600;
-			const x1 = 200;
-			let y1 = 200;
-
-			if (direction === "up") {
-				const tmp = y0;
-				y0 = y1;
-				y1 = tmp;
-			}
-
-			const url = `http://localhost:${port}/session/${sessionId}/actions`;
-			await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					actions: [
-						{
-							type: "pointer",
-							id: "finger1",
-							parameters: { pointerType: "touch" },
-							actions: [
-								{ type: "pointerMove", duration: 0, x: x0, y: y0 },
-								{ type: "pointerDown", button: 0 },
-								{ type: "pointerMove", duration: 0, x: x1, y: y1 },
-								{ type: "pause", duration: 1000 },
-								{ type: "pointerUp", button: 0 }
-							]
-						}
-					]
-				}),
-			});
-		});
+		return this.wda.swipe(direction);
 	}
 
 	public async tap(x: number, y: number) {
-		await this.withinSession(async (port, sessionId) => {
-			const url = `http://localhost:${port}/session/${sessionId}/actions`;
-			await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					actions: [
-						{
-							type: "pointer",
-							id: "finger1",
-							parameters: { pointerType: "touch" },
-							actions: [
-								{ type: "pointerMove", duration: 0, x, y },
-								{ type: "pointerDown", button: 0 },
-								{ type: "pause", duration: 100 },
-								{ type: "pointerUp", button: 0 }
-							]
-						}
-					]
-				}),
-			});
-		});
+		return this.wda.tap(x, y);
 	}
 
 	public async pressButton(button: Button) {
-		const _map = {
-			"HOME": "home",
-			"VOLUME_UP": "volumeup",
-			"VOLUME_DOWN": "volumedown",
-		};
-
-		if (button === "ENTER") {
-			await this.sendKeys("\n");
-			return;
-		}
-
-		// Type assertion to check if button is a key of _map
-		if (!(button in _map)) {
-			throw new Error(`Button "${button}" is not supported`);
-		}
-
-		await this.withinSession(async (port, sessionId) => {
-			const url = `http://localhost:${port}/session/${sessionId}/wda/pressButton`;
-			const response = await fetch(url, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify({
-					name: button,
-				}),
-			});
-
-			return response.json();
-		});
-	}
-
-	private async createSession(port: number) {
-		const url = `http://localhost:${port}/session`;
-		const response = await fetch(url, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json",
-			},
-			body: JSON.stringify({ capabilities: { alwaysMatch: { platformName: "iOS" } } }),
-		});
-
-		const json = await response.json();
-		return json.value.sessionId;
-	}
-
-	private async deleteSession(port: number, sessionId: string) {
-		const url = `http://localhost:${port}/session/${sessionId}`;
-		const response = await fetch(url, { method: "DELETE" });
-		return response.json();
-	}
-
-	private async withinSession(fn: (port: number, sessionId: string) => Promise<any>) {
-		const port = 8100;
-		const sessionId = await this.createSession(port);
-		const result = await fn(port, sessionId);
-		await this.deleteSession(port, sessionId);
-		return result;
-	}
-
-	private filterSourceElements(source: SourceTreeElement): Array<any> {
-
-		const output: any[] = [];
-
-		console.error("gilm " + JSON.stringify(source));
-		if (["TextField", "Button", "Switch"].includes(source.type)) {
-			output.push({
-				type: source.type,
-				label: source.label,
-				name: source.name,
-				rect: {
-					x0: source.rect.x,
-					y0: source.rect.y,
-					x1: source.rect.x + source.rect.width,
-					y1: source.rect.y + source.rect.height,
-				},
-			});
-		}
-
-		if (source.children) {
-			for (const child of source.children) {
-				output.push(...this.filterSourceElements(child));
-			}
-		}
-
-		return output;
-	}
-
-	public async getPageSource(): Promise<SourceTree> {
-		const port = 8100;
-		const url = `http://localhost:${port}/source/?format=json`;
-		const response = await fetch(url);
-		const json = await response.json();
-		return json as SourceTree;
+		await this.wda.pressButton(button);
 	}
 
 	public async getElementsOnScreen(): Promise<any[]> {
-		const source = await this.getPageSource();
-		return this.filterSourceElements(source.value);
+		return await this.wda.getElementsOnScreen();
 	}
 }
 

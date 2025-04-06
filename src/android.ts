@@ -1,7 +1,9 @@
-import { execFileSync, execSync } from "child_process";
-import * as xml from "fast-xml-parser";
-import { Bounds, Button, Dimensions, ElementCoordinates, Robot, SwipeDirection } from "./robot";
 import path from "path";
+import { execFileSync } from "child_process";
+
+import * as xml from "fast-xml-parser";
+
+import { Bounds, Button, Dimensions, ElementCoordinates, Robot, SwipeDirection } from "./robot";
 
 interface UiAutomatorXmlNode {
 	node: UiAutomatorXmlNode[];
@@ -16,10 +18,40 @@ interface UiAutomatorXml {
 	};
 }
 
+const getAdbPath = (): string => {
+	let executable = "adb";
+	if (process.env.ANDROID_HOME) {
+		executable = path.join(process.env.ANDROID_HOME, "platform-tools", "adb");
+	}
+
+	return executable;
+};
+
+const BUTTON_MAP: Record<Button, string> = {
+	"BACK": "KEYCODE_BACK",
+	"HOME": "KEYCODE_HOME",
+	"VOLUME_UP": "KEYCODE_VOLUME_UP",
+	"VOLUME_DOWN": "KEYCODE_VOLUME_DOWN",
+	"ENTER": "KEYCODE_ENTER",
+};
+
+const TIMEOUT = 30000;
+const MAX_BUFFER_SIZE = 1024 * 1024 * 4;
+
 export class AndroidRobot implements Robot {
 
+	public constructor(private deviceId: string) {
+	}
+
+	public adb(...args: string[]): Buffer {
+		return execFileSync(getAdbPath(), ["-s", this.deviceId, ...args], {
+			maxBuffer: MAX_BUFFER_SIZE,
+			timeout: TIMEOUT,
+		});
+	}
+
 	public async getScreenSize(): Promise<Dimensions> {
-		const screenSize = execSync("adb shell wm size")
+		const screenSize = this.adb("shell", "wm", "size")
 			.toString()
 			.split(" ")
 			.pop();
@@ -32,21 +64,8 @@ export class AndroidRobot implements Robot {
 		return { width, height };
 	}
 
-	public adb(args: string[]): Buffer {
-
-		let executable = "adb";
-		if (process.env.ANDROID_HOME) {
-			executable = path.join(process.env.ANDROID_HOME, "platform-tools", "adb");
-		}
-
-		return execFileSync(executable, args, {
-			maxBuffer: 1024 * 1024 * 4,
-			timeout: 30000,
-		});
-	}
-
 	public async listApps(): Promise<string[]> {
-		const result = this.adb(["shell", "cmd", "package", "query-activities", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER"])
+		const result = this.adb("shell", "cmd", "package", "query-activities", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER")
 			.toString()
 			.split("\n")
 			.map(line => line.trim())
@@ -58,7 +77,7 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async launchApp(packageName: string): Promise<void> {
-		this.adb(["shell", "monkey", "-p", packageName, "-c", "android.intent.category.LAUNCHER", "1"]);
+		this.adb("shell", "monkey", "-p", packageName, "-c", "android.intent.category.LAUNCHER", "1");
 	}
 
 	public async swipe(direction: SwipeDirection): Promise<void> {
@@ -83,11 +102,11 @@ export class AndroidRobot implements Robot {
 				throw new Error(`Swipe direction "${direction}" is not supported`);
 		}
 
-		this.adb(["shell", "input", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "1000"]);
+		this.adb("shell", "input", "swipe", `${x0}`, `${y0}`, `${x1}`, `${y1}`, "1000");
 	}
 
 	public async getScreenshot(): Promise<Buffer> {
-		return this.adb(["shell", "screencap", "-p"]);
+		return this.adb("shell", "screencap", "-p");
 	}
 
 	private collectElements(node: UiAutomatorXmlNode, screenSize: Dimensions): any[] {
@@ -142,7 +161,7 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async getElementsOnScreen(): Promise<any[]> {
-		const dump = this.adb(["exec-out", "uiautomator", "dump", "/dev/tty"]);
+		const dump = this.adb("exec-out", "uiautomator", "dump", "/dev/tty");
 
 		const parser = new xml.XMLParser({
 			ignoreAttributes: false,
@@ -158,42 +177,34 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async terminateApp(packageName: string): Promise<void> {
-		this.adb(["shell", "am", "force-stop", packageName]);
+		this.adb("shell", "am", "force-stop", packageName);
 	}
 
 	public async openUrl(url: string): Promise<void> {
-		this.adb(["shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", url]);
+		this.adb("shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", url);
 	}
 
 	public async sendKeys(text: string): Promise<void> {
 		// adb shell requires some escaping
 		const _text = text.replace(/ /g, "\\ ");
-		this.adb(["shell", "input", "text", _text]);
+		this.adb("shell", "input", "text", _text);
 	}
 
 	public async pressButton(button: Button) {
-		const _map = {
-			"BACK": "KEYCODE_BACK",
-			"HOME": "KEYCODE_HOME",
-			"VOLUME_UP": "KEYCODE_VOLUME_UP",
-			"VOLUME_DOWN": "KEYCODE_VOLUME_DOWN",
-			"ENTER": "KEYCODE_ENTER",
-		};
-
-		if (!_map[button]) {
+		if (!BUTTON_MAP[button]) {
 			throw new Error(`Button "${button}" is not supported`);
 		}
 
-		this.adb(["shell", "input", "keyevent", _map[button]]);
+		this.adb("shell", "input", "keyevent", BUTTON_MAP[button]);
 	}
 
 	public async tap(x: number, y: number): Promise<void> {
-		this.adb(["shell", "input", "tap", `${x}`, `${y}`]);
+		this.adb("shell", "input", "tap", `${x}`, `${y}`);
 	}
 }
 
 export const getConnectedDevices = (): string[] => {
-	return execSync(`adb devices`)
+	return execFileSync(getAdbPath(), ["devices"])
 		.toString()
 		.split("\n")
 		.filter(line => !line.startsWith("List of devices attached"))
