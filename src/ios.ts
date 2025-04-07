@@ -3,9 +3,13 @@ import { join } from "path";
 import { randomBytes } from "crypto";
 import { readFileSync, unlinkSync } from "fs";
 import { execFileSync } from "child_process";
+import { Socket } from "net";
 
 import { WebDriverAgent } from "./webdriver-agent";
-import { Button, Dimensions, Robot, SwipeDirection } from "./robot";
+import { Button, Dimensions, InstalledApp, Robot, SwipeDirection } from "./robot";
+
+const WDA_PORT = 8100;
+const IOS_TUNNEL_PORT = 60105;
 
 interface ListCommandOutput {
 	deviceList: string[];
@@ -17,10 +21,42 @@ const getGoIosPath = (): string => {
 
 export class IosRobot implements Robot {
 
-	private readonly wda: WebDriverAgent;
-
 	public constructor(private deviceId: string) {
-		this.wda = new WebDriverAgent("localhost", 8100);
+	}
+
+	private isListeningOnPort(port: number): Promise<boolean> {
+		return new Promise((resolve, reject) => {
+			const client = new Socket();
+			client.connect(port, "localhost", () => {
+				client.destroy();
+				resolve(true);
+			});
+
+			client.on("error", (err: any) => {
+				resolve(false);
+			});
+		});
+	}
+
+	private async isTunnelRunning(): Promise<boolean> {
+		return await this.isListeningOnPort(IOS_TUNNEL_PORT);
+	}
+
+	private async isWdaForwardRunning(): Promise<boolean> {
+		return await this.isListeningOnPort(WDA_PORT);
+	}
+
+	private async wda(): Promise<WebDriverAgent> {
+		if (!(await this.isTunnelRunning())) {
+			throw new Error("iOS tunnel is not running, please see https://github.com/mobile-next/mobile-mcp/wiki/Getting-Started-with-iOS");
+		}
+
+		if (!(await this.isWdaForwardRunning())) {
+			throw new Error("Port forwarding to WebDriverAgent is not running, please see https://github.com/mobile-next/mobile-mcp/wiki/Getting-Started-with-iOS");
+		}
+
+		const wda = new WebDriverAgent("localhost", WDA_PORT);
+		return wda;
 	}
 
 	private async ios(...args: string[]): Promise<string> {
@@ -28,18 +64,26 @@ export class IosRobot implements Robot {
 	}
 
 	public async getScreenSize(): Promise<Dimensions> {
-		return await this.wda.getScreenSize();
+		const wda = await this.wda();
+		return await wda.getScreenSize();
 	}
 
 	public async swipe(direction: SwipeDirection): Promise<void> {
-		await this.wda.swipe(direction);
+		const wda = await this.wda();
+		await wda.swipe(direction);
 	}
 
-	public async listApps(): Promise<string[]> {
+	public async listApps(): Promise<InstalledApp[]> {
 		const output = await this.ios("apps", "--all", "--list");
 		return output
 			.split("\n")
-			.map(line => line.split(" ")[0]);
+			.map(line => {
+				const [packageName, appName] = line.split(" ");
+				return {
+					packageName,
+					appName,
+				};
+			});
 	}
 
 	public async launchApp(packageName: string): Promise<void> {
@@ -51,23 +95,28 @@ export class IosRobot implements Robot {
 	}
 
 	public async openUrl(url: string): Promise<void> {
-		await this.wda.openUrl(url);
+		const wda = await this.wda();
+		await wda.openUrl(url);
 	}
 
 	public async sendKeys(text: string): Promise<void> {
-		await this.wda.sendKeys(text);
+		const wda = await this.wda();
+		await wda.sendKeys(text);
 	}
 
 	public async pressButton(button: Button): Promise<void> {
-		await this.wda.pressButton(button);
+		const wda = await this.wda();
+		await wda.pressButton(button);
 	}
 
 	public async tap(x: number, y: number): Promise<void> {
-		await this.wda.tap(x, y);
+		const wda = await this.wda();
+		await wda.tap(x, y);
 	}
 
 	public async getElementsOnScreen(): Promise<any[]> {
-		return await this.wda.getElementsOnScreen();
+		const wda = await this.wda();
+		return await wda.getElementsOnScreen();
 	}
 
 	public async getScreenshot(): Promise<Buffer> {

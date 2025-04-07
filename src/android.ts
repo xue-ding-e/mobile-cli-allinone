@@ -3,7 +3,7 @@ import { execFileSync } from "child_process";
 
 import * as xml from "fast-xml-parser";
 
-import { Bounds, Button, Dimensions, ElementCoordinates, Robot, SwipeDirection } from "./robot";
+import { Bounds, Button, Dimensions, ElementCoordinates, InstalledApp, Robot, SwipeDirection } from "./robot";
 
 interface UiAutomatorXmlNode {
 	node: UiAutomatorXmlNode[];
@@ -64,16 +64,18 @@ export class AndroidRobot implements Robot {
 		return { width, height };
 	}
 
-	public async listApps(): Promise<string[]> {
-		const result = this.adb("shell", "cmd", "package", "query-activities", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER")
+	public async listApps(): Promise<InstalledApp[]> {
+		return this.adb("shell", "cmd", "package", "query-activities", "-a", "android.intent.action.MAIN", "-c", "android.intent.category.LAUNCHER")
 			.toString()
 			.split("\n")
 			.map(line => line.trim())
 			.filter(line => line.startsWith("packageName="))
 			.map(line => line.substring("packageName=".length))
-			.filter((value, index, self) => self.indexOf(value) === index);
-
-		return result;
+			.filter((value, index, self) => self.indexOf(value) === index)
+			.map(packageName => ({
+				packageName,
+				appName: packageName,
+			}));
 	}
 
 	public async launchApp(packageName: string): Promise<void> {

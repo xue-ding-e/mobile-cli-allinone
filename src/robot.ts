@@ -15,6 +15,11 @@ export interface Dimensions {
 	height: number;
 }
 
+export interface InstalledApp {
+	packageName: string;
+	appName: string;
+}
+
 export type SwipeDirection = "up" | "down" | "left" | "right";
 
 export type Button = "HOME" | "BACK" | "VOLUME_UP" | "VOLUME_DOWN" | "ENTER";
@@ -40,7 +45,7 @@ export interface Robot {
 	 * List all installed apps on the device. Returns an array of package names (or
 	 * bundle identifiers in iOS) for all installed apps.
 	 */
-	listApps(): Promise<string[]>;
+	listApps(): Promise<InstalledApp[]>;
 
 	/**
 	 * Launch an app.

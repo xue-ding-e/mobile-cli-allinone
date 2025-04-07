@@ -37,7 +37,8 @@ hasOneAndroidDevice && describe("android", () => {
 
 	it("should be able to list apps", async () => {
 		const apps = await android.listApps();
-		assert.ok(apps.includes("com.android.settings"));
+		const packages = apps.map(app => app.packageName);
+		assert.ok(packages.includes("com.android.settings"));
 	});
 
 	it("should be able to open a url", async () => {

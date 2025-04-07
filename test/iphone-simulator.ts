@@ -42,9 +42,10 @@ describe("ios", () => {
 
 	it("should be able to list apps", async () => {
 		const apps = await simctl.listApps();
-		assert.ok(apps.includes("com.apple.mobilesafari"));
-		assert.ok(apps.includes("com.apple.reminders"));
-		assert.ok(apps.includes("com.apple.Preferences"));
+		const packages = apps.map(app => app.packageName);
+		assert.ok(packages.includes("com.apple.mobilesafari"));
+		assert.ok(packages.includes("com.apple.reminders"));
+		assert.ok(packages.includes("com.apple.Preferences"));
 	});
 
 	it("should be able to get elements on screen", async () => {

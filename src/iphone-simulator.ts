@@ -1,7 +1,7 @@
 import { execFileSync, execSync } from "child_process";
 
 import { WebDriverAgent } from "./webdriver-agent";
-import { Button, Dimensions, Robot, SwipeDirection } from "./robot";
+import { Button, Dimensions, InstalledApp, Robot, SwipeDirection } from "./robot";
 
 export interface Simulator {
 	name: string;
@@ -101,10 +101,13 @@ export class Simctl implements Robot {
 		return result;
 	}
 
-	public async listApps(): Promise<string[]> {
+	public async listApps(): Promise<InstalledApp[]> {
 		const text = this.simctl("listapps", this.simulatorUuid).toString();
 		const apps = this.parseIOSAppData(text);
-		return apps.map(app => app.CFBundleIdentifier);
+		return apps.map(app => ({
+			packageName: app.CFBundleIdentifier,
+			appName: app.CFBundleDisplayName,
+		}));
 	}
 
 	public async getScreenSize(): Promise<Dimensions> {
