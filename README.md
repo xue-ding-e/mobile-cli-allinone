@@ -59,6 +59,8 @@ How we help to scale mobile automation:
 
 ## Installation and configuration
 
+[Read more in our wiki](https://github.com/mobile-next/mobile-mcp/wiki)! 🚀
+
 [Detailed guide for Claude Desktop](https://modelcontextprotocol.io/quickstart/user)
 
 ```json
