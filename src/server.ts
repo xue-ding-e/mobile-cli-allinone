@@ -49,6 +49,12 @@ export const createMcpServer = (): McpServer => {
 	let robot: Robot | null;
 	const simulatorManager = new SimctlManager();
 
+	const requireRobot = () => {
+		if (!robot) {
+			throw new Error("No device selected. Use the mobile_use_device tool to select a device.");
+		}
+	};
+
 	tool(
 		"mobile_list_available_devices",
 		"List all available devices. This includes both physical devices and simulators. If there is more than one device returned, you need to let the user select one of them.",
@@ -71,7 +77,6 @@ export const createMcpServer = (): McpServer => {
 			deviceType: z.enum(["simulator", "ios", "android"]).describe("The type of device to select"),
 		},
 		async ({ device, deviceType }) => {
-			console.log(device, deviceType);
 			switch (deviceType) {
 				case "simulator":
 					robot = simulatorManager.getSimulator(device);
@@ -93,12 +98,9 @@ export const createMcpServer = (): McpServer => {
 		"List all the installed apps on the device",
 		{},
 		async ({}) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			const result = await robot.listApps();
-			return `Found these packages on device: ${result.join(",")}`;
+			requireRobot();
+			const result = await robot!.listApps();
+			return `Found these apps on device: ${result.map(app => `${app.appName} (${app.packageName})`).join(", ")}`;
 		}
 	);
 
@@ -109,11 +111,8 @@ export const createMcpServer = (): McpServer => {
 			packageName: z.string().describe("The package name of the app to launch"),
 		},
 		async ({ packageName }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			await robot.launchApp(packageName);
+			requireRobot();
+			await robot!.launchApp(packageName);
 			return `Launched app ${packageName}`;
 		}
 	);
@@ -125,11 +124,8 @@ export const createMcpServer = (): McpServer => {
 			packageName: z.string().describe("The package name of the app to terminate"),
 		},
 		async ({ packageName }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			await robot.terminateApp(packageName);
+			requireRobot();
+			await robot!.terminateApp(packageName);
 			return `Terminated app ${packageName}`;
 		}
 	);
@@ -139,11 +135,8 @@ export const createMcpServer = (): McpServer => {
 		"Get the screen size of the mobile device in pixels",
 		{},
 		async ({}) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			const screenSize = await robot.getScreenSize();
+			requireRobot();
+			const screenSize = await robot!.getScreenSize();
 			return `Screen size is ${screenSize.width}x${screenSize.height} pixels`;
 		}
 	);
@@ -156,14 +149,11 @@ export const createMcpServer = (): McpServer => {
 			y: z.number().describe("The y coordinate to click between 0 and 1"),
 		},
 		async ({ x, y }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			const screenSize = await robot.getScreenSize();
+			requireRobot();
+			const screenSize = await robot!.getScreenSize();
 			const x0 = Math.floor(screenSize.width * x);
 			const y0 = Math.floor(screenSize.height * y);
-			await robot.tap(x0, y0);
+			await robot!.tap(x0, y0);
 			return `Clicked on screen at coordinates: ${x}, ${y}`;
 		}
 	);
@@ -174,12 +164,9 @@ export const createMcpServer = (): McpServer => {
 		{
 		},
 		async ({}) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			const screenSize = await robot.getScreenSize();
-			const elements = await robot.getElementsOnScreen();
+			requireRobot();
+			const screenSize = await robot!.getScreenSize();
+			const elements = await robot!.getElementsOnScreen();
 
 			const result = elements.map(element => {
 				const x0 = element.rect.x0 / screenSize.width;
@@ -203,14 +190,11 @@ export const createMcpServer = (): McpServer => {
 		"mobile_press_button",
 		"Press a button on device",
 		{
-			button: z.string().describe("The button to press. Supported buttons: BACK, HOME, VOLUME_UP, VOLUME_DOWN, ENTER"),
+			button: z.string().describe("The button to press. Supported buttons: BACK (android only), HOME, VOLUME_UP, VOLUME_DOWN, ENTER"),
 		},
 		async ({ button }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			robot.pressButton(button);
+			requireRobot();
+			robot!.pressButton(button);
 			return `Pressed the button: ${button}`;
 		}
 	);
@@ -222,11 +206,8 @@ export const createMcpServer = (): McpServer => {
 			url: z.string().describe("The URL to open"),
 		},
 		async ({ url }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			robot.openUrl(url);
+			requireRobot();
+			robot!.openUrl(url);
 			return `Opened URL: ${url}`;
 		}
 	);
@@ -238,11 +219,8 @@ export const createMcpServer = (): McpServer => {
 			direction: z.enum(["up", "down"]).describe("The direction to swipe"),
 		},
 		async ({ direction }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			robot.swipe(direction);
+			requireRobot();
+			robot!.swipe(direction);
 			return `Swiped ${direction} on screen`;
 		}
 	);
@@ -255,14 +233,11 @@ export const createMcpServer = (): McpServer => {
 			submit: z.boolean().describe("Whether to submit the text. If true, the text will be submitted as if the user pressed the enter key."),
 		},
 		async ({ text, submit }) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
-
-			await robot.sendKeys(text);
+			requireRobot();
+			await robot!.sendKeys(text);
 
 			if (submit) {
-				await robot.pressButton("ENTER");
+				await robot!.pressButton("ENTER");
 			}
 
 			return `Typed text: ${text}`;
@@ -274,12 +249,10 @@ export const createMcpServer = (): McpServer => {
 		"Take a screenshot of the mobile device. Use this to understand what's on screen, if you need to press an element that is available through view hierarchy then you must list elements on screen instead. Do not cache this result.",
 		{},
 		async ({}) => {
-			if (!robot) {
-				throw new Error("No device selected");
-			}
+			requireRobot();
 
 			try {
-				const screenshot = await robot.getScreenshot();
+				const screenshot = await robot!.getScreenshot();
 
 				// Scale down the screenshot by 50%
 				const image = sharp(screenshot);
