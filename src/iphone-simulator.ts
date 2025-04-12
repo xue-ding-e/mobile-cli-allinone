@@ -1,12 +1,23 @@
-import { execFileSync, execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 import { WebDriverAgent } from "./webdriver-agent";
-import { Button, Dimensions, InstalledApp, Robot, SwipeDirection } from "./robot";
+import { Button, InstalledApp, Robot, ScreenSize, SwipeDirection } from "./robot";
 
 export interface Simulator {
 	name: string;
 	uuid: string;
 	state: string;
+}
+
+interface ListDevicesResponse {
+	devices: {
+		[key: string]: Array<{
+			state: string;
+			name: string;
+			isAvailable: boolean;
+			udid: string;
+		}>,
+	},
 }
 
 interface AppInfo {
@@ -110,7 +121,7 @@ export class Simctl implements Robot {
 		}));
 	}
 
-	public async getScreenSize(): Promise<Dimensions> {
+	public async getScreenSize(): Promise<ScreenSize> {
 		return this.wda.getScreenSize();
 	}
 
@@ -137,30 +148,18 @@ export class Simctl implements Robot {
 
 export class SimctlManager {
 
-	private parseSimulator(line: string): Simulator | null {
-		// extract device name and UUID from the line
-		const match = line.match(/(.*?)\s+\(([\w-]+)\)\s+\((\w+)\)/);
-		if (!match) {
-			return null;
-		}
-
-		const deviceName = match[1].trim();
-		const deviceUuid = match[2];
-		const deviceState = match[3];
-
-		return {
-			name: deviceName,
-			uuid: deviceUuid,
-			state: deviceState,
-		};
-	}
-
 	public listSimulators(): Simulator[] {
-		return execSync(`xcrun simctl list devices`)
-			.toString()
-			.split("\n")
-			.map(line => this.parseSimulator(line))
-			.filter(simulator => simulator !== null);
+		const text = execFileSync("xcrun", ["simctl", "list", "devices", "-j"]).toString();
+		const json: ListDevicesResponse = JSON.parse(text);
+		return Object.values(json.devices).flatMap(device => {
+			return device.map(d => {
+				return {
+					name: d.name,
+					uuid: d.udid,
+					state: d.state,
+				};
+			});
+		});
 	}
 
 	public listBootedSimulators(): Simulator[] {
