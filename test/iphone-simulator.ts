@@ -69,7 +69,8 @@ describe("iphone-simulator", () => {
 		const screenSize = await simctl.getScreenSize();
 		assert.ok(screenSize.width > 256);
 		assert.ok(screenSize.height > 256);
-		assert.equal(Object.keys(screenSize).length, 2, "screenSize should have exactly 2 properties");
+		assert.ok(screenSize.scale >= 1);
+		assert.equal(Object.keys(screenSize).length, 3, "screenSize should have exactly 3 properties");
 	});
 
 	it("should be able to get screenshot", async function() {

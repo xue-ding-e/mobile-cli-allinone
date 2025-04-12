@@ -16,7 +16,8 @@ describe("android", () => {
 		const screenSize = await android.getScreenSize();
 		assert.ok(screenSize.width > 1024);
 		assert.ok(screenSize.height > 1024);
-		assert.equal(Object.keys(screenSize).length, 2, "screenSize should have exactly 2 properties");
+		assert.ok(screenSize.scale === 1);
+		assert.equal(Object.keys(screenSize).length, 3, "screenSize should have exactly 3 properties");
 	});
 
 	it("should be able to take screenshot", async function() {
