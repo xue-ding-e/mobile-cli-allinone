@@ -1,6 +1,6 @@
-## Mobile Next - MCP server for Mobile Automation
+# Mobile Next - MCP server for Mobile Development and Automation  | iOS, Android, Simulator, Emulator, and physical devices
 
-This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that enables scalable mobile automation through a platform-agnostic interface, eliminating the need for distinct iOS or Android knowledge.
+This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that enables scalable mobile automation, development through a platform-agnostic interface, eliminating the need for distinct iOS or Android knowledge. You can run it on emulators, simulators, and physical devices (iOS and Android).
 This server allows Agents and LLMs to interact with native iOS/Android applications and devices through structured accessibility snapshots or coordinate-based taps based on screenshots. 
 
 https://github.com/user-attachments/assets/c4e89c4f-cc71-4424-8184-bdbc8c638fa1
