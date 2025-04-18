@@ -29,6 +29,7 @@ Check out our detailed roadmap to see upcoming features, improvements, and miles
 
 👉 [Explore the Roadmap](https://github.com/orgs/mobile-next/projects/1)
 
+
 ### Main use cases
 
 How we help to scale mobile automation:
@@ -47,7 +48,7 @@ How we help to scale mobile automation:
 - 📊 **Deterministic tool application**: Reduces ambiguity found in purely screenshot-based approaches by relying on structured data whenever possible.
 - 📺 **Extract structured data**: Enables you to extract structred data from anything visible on screen. 
 
-## Mobile MCP Architecture
+## 🏗️ Mobile MCP Architecture
 
 <p align="center">
     <a href="https://raw.githubusercontent.com/mobile-next/mobile-next-assets/refs/heads/main/mobile-mcp-arch-1.png">
@@ -55,6 +56,10 @@ How we help to scale mobile automation:
     </a>
 </p>
 
+
+## 📚 Wiki page 
+
+More details in our [wiki page](https://github.com/mobile-next/mobile-mcp/wiki) for setup, configuration and debugging related questions.
 
 
 ## Installation and configuration
