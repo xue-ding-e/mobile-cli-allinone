@@ -173,17 +173,28 @@ export class Simctl implements Robot {
 export class SimctlManager {
 
 	public listSimulators(): Simulator[] {
-		const text = execFileSync("xcrun", ["simctl", "list", "devices", "-j"]).toString();
-		const json: ListDevicesResponse = JSON.parse(text);
-		return Object.values(json.devices).flatMap(device => {
-			return device.map(d => {
-				return {
-					name: d.name,
-					uuid: d.udid,
-					state: d.state,
-				};
+		// detect if this is a mac
+		if (process.platform !== "darwin") {
+			// don't even try to run xcrun
+			return [];
+		}
+
+		try {
+			const text = execFileSync("xcrun", ["simctl", "list", "devices", "-j"]).toString();
+			const json: ListDevicesResponse = JSON.parse(text);
+			return Object.values(json.devices).flatMap(device => {
+				return device.map(d => {
+					return {
+						name: d.name,
+						uuid: d.udid,
+						state: d.state,
+					};
+				});
 			});
-		});
+		} catch (error) {
+			console.error("Error listing simulators", error);
+			return [];
+		}
 	}
 
 	public listBootedSimulators(): Simulator[] {
