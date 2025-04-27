@@ -64,7 +64,7 @@ More details in our [wiki page](https://github.com/mobile-next/mobile-mcp/wiki) 
 
 ## Installation and configuration
 
-[Detailed guide for Claude Desktop](https://modelcontextprotocol.io/quickstart/user)
+Setup our MCP with Cursor, Claude, VS Code, Github Copilot:
 
 ```json
 {
