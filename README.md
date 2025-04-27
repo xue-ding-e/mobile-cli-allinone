@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/c4e89c4f-cc71-4424-8184-bdbc8c638fa1
 Join us on our journey as we continuously enhance Mobile MCP! 
 Check out our detailed roadmap to see upcoming features, improvements, and milestones. Your feedback is invaluable in shaping the future of mobile automation.
 
-👉 [Explore the Roadmap](https://github.com/orgs/mobile-next/projects/1)
+👉 [Explore the Roadmap](https://github.com/orgs/mobile-next/projects/3)
 
 
 ### Main use cases
