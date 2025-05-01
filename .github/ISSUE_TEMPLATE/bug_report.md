@@ -11,6 +11,7 @@ assignees: ''
 A clear and concise description of what the bug is.
 
 **Configuration (please complete the following information):**
+- Agent: [e.g, Claude Desktop, Cursor]
 - OS: [e.g, Mac, Linux, Windows]
 - Device used: [e.g. Android, iOS, iOS Simulator]
 - Device version: [e.g, 18.3.2]
