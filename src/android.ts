@@ -5,6 +5,11 @@ import * as xml from "fast-xml-parser";
 
 import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenElementRect, ScreenSize, SwipeDirection, Orientation } from "./robot";
 
+export interface AndroidDevice {
+	deviceId: string;
+	deviceType: "tv" | "mobile";
+}
+
 interface UiAutomatorXmlNode {
 	node: UiAutomatorXmlNode[];
 	class?: string;
@@ -36,29 +41,21 @@ const BUTTON_MAP: Record<Button, string> = {
 	"VOLUME_UP": "KEYCODE_VOLUME_UP",
 	"VOLUME_DOWN": "KEYCODE_VOLUME_DOWN",
 	"ENTER": "KEYCODE_ENTER",
+	"DPAD_CENTER": "KEYCODE_DPAD_CENTER",
+	"DPAD_UP": "KEYCODE_DPAD_UP",
+	"DPAD_DOWN": "KEYCODE_DPAD_DOWN",
+	"DPAD_LEFT": "KEYCODE_DPAD_LEFT",
+	"DPAD_RIGHT": "KEYCODE_DPAD_RIGHT",
 };
 
 const TIMEOUT = 30000;
 const MAX_BUFFER_SIZE = 1024 * 1024 * 4;
 
-type AndroidDeviceType = "tv" | "standard";
-
-type DpadButton = "DPAD_UP" | "DPAD_DOWN" | "DPAD_LEFT" | "DPAD_RIGHT" | "DPAD_CENTER";
+type AndroidDeviceType = "tv" | "mobile";
 
 export class AndroidRobot implements Robot {
 
-	public deviceType: AndroidDeviceType = "standard"; // Default to standard
-
 	public constructor(private deviceId: string) {
-		// --- Device Type Detection ---
-		try {
-			const features = this.adb("shell", "pm", "list", "features").toString();
-			if (features.includes("android.software.leanback") || features.includes("android.hardware.type.television")) {
-				this.deviceType = "tv";
-			}
-		} catch (error: any) {
-			// Defaulting to 'standard' is already set
-		}
 	}
 
 	public adb(...args: string[]): Buffer {
@@ -66,6 +63,15 @@ export class AndroidRobot implements Robot {
 			maxBuffer: MAX_BUFFER_SIZE,
 			timeout: TIMEOUT,
 		});
+	}
+
+	public getSystemFeatures(): string[] {
+		return this.adb("shell", "pm", "list", "features")
+			.toString()
+			.split("\n")
+			.map(line => line.trim())
+			.filter(line => line.startsWith("feature:"))
+			.map(line => line.substring("feature:".length));
 	}
 
 	public async getScreenSize(): Promise<ScreenSize> {
@@ -99,6 +105,15 @@ export class AndroidRobot implements Robot {
 
 	public async launchApp(packageName: string): Promise<void> {
 		this.adb("shell", "monkey", "-p", packageName, "-c", "android.intent.category.LAUNCHER", "1");
+	}
+
+	public async listRunningProcesses(): Promise<string[]> {
+		return this.adb("shell", "ps", "-e")
+			.toString()
+			.split("\n")
+			.map(line => line.trim())
+			.filter(line => line.startsWith("u")) // non-system processes
+			.map(line => line.split(/\s+/)[8]); // get process name
 	}
 
 	public async swipe(direction: SwipeDirection): Promise<void> {
@@ -146,10 +161,15 @@ export class AndroidRobot implements Robot {
 		if (node.text || node["content-desc"] || node.hint) {
 			const element: ScreenElement = {
 				type: node.class || "text",
-				name: node.text,
+				text: node.text,
 				label: node["content-desc"] || node.hint || "",
 				rect: this.getScreenElementRect(node),
 			};
+
+			if (node.focused === "true") {
+				// only provide it if it's true, otherwise don't confuse llm
+				element.focused = true;
+			}
 
 			if (element.rect.width > 0 && element.rect.height > 0) {
 				elements.push(element);
@@ -160,9 +180,8 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async getElementsOnScreen(): Promise<ScreenElement[]> {
-		const parsedXml = this.getParsedXml();
+		const parsedXml = await this.getUiAutomatorXml();
 		const hierarchy = parsedXml.hierarchy;
-
 		const elements = this.collectElements(hierarchy.node);
 		return elements;
 	}
@@ -200,44 +219,36 @@ export class AndroidRobot implements Robot {
 		const orientationValue = orientation === "portrait" ? 0 : 1;
 
 		// Set orientation using content provider
-		this.adb(
-			"shell",
-			"content",
-			"insert",
-			"--uri",
-			"content://settings/system",
-			"--bind",
-			"name:s:user_rotation",
-			"--bind",
-			`value:i:${orientationValue}`
-		);
+		this.adb("shell", "content", "insert", "--uri", "content://settings/system", "--bind", "name:s:user_rotation", "--bind", `value:i:${orientationValue}`);
 
 		// Force the orientation change
-		this.adb(
-			"shell",
-			"settings",
-			"put",
-			"system",
-			"accelerometer_rotation",
-			"0"
-		);
+		this.adb("shell", "settings", "put", "system", "accelerometer_rotation", "0");
 	}
 
 	public async getOrientation(): Promise<Orientation> {
-		const rotation = this.adb(
-			"shell",
-			"settings",
-			"get",
-			"system",
-			"user_rotation"
-		).toString().trim();
-
+		const rotation = this.adb("shell", "settings", "get", "system", "user_rotation").toString().trim();
 		return rotation === "0" ? "portrait" : "landscape";
 	}
 
-	private getParsedXml(): UiAutomatorXml {
-		const dump = this.adb("exec-out", "uiautomator", "dump", "/dev/tty");
+	private async getUiAutomatorDump(): Promise<string> {
+		for (let tries = 0; tries < 10; tries++) {
+			const dump = this.adb("exec-out", "uiautomator", "dump", "/dev/tty").toString();
+			// note: we're not catching other errors here. maybe we should check for <?xml
+			if (dump.includes("null root node returned by UiTestAutomationBridge")) {
+				// uncomment for debugging
+				// const screenshot = await this.getScreenshot();
+				// console.error("Failed to get UIAutomator XML. Here's a screenshot: " + screenshot.toString("base64"));
+				continue;
+			}
 
+			return dump;
+		}
+
+		throw new ActionableError("Failed to get UIAutomator XML");
+	}
+
+	private async getUiAutomatorXml(): Promise<UiAutomatorXml> {
+		const dump = await this.getUiAutomatorDump();
 		const parser = new xml.XMLParser({
 			ignoreAttributes: false,
 			attributeNamePrefix: ""
@@ -257,151 +268,36 @@ export class AndroidRobot implements Robot {
 			height: bottom - top,
 		};
 	}
+}
 
-	// --- TV Specific Methods ---
+export class AndroidDeviceManager {
 
-	public navigateToItemWithLabel(label: string) {
-		this.requireAndroidTv();
-		let currentDirection = this.getNextDpadDirectionToItemWithLabel(label);
-
-		while (currentDirection) {
-			this.pressDpadInternal(currentDirection);
-			currentDirection = this.getNextDpadDirectionToItemWithLabel(label);
+	private getDeviceType(name: string): AndroidDeviceType {
+		const device = new AndroidRobot(name);
+		const features = device.getSystemFeatures();
+		if (features.includes("android.software.leanback") || features.includes("android.hardware.type.television")) {
+			return "tv";
 		}
+
+		return "mobile";
 	}
 
-	public pressDpad(dpadButton: DpadButton) {
-		this.requireAndroidTv();
-		this.pressDpadInternal(dpadButton);
-	}
+	public getConnectedDevices(): AndroidDevice[] {
+		try {
+			const names = execFileSync(getAdbPath(), ["devices"])
+				.toString()
+				.split("\n")
+				.filter(line => !line.startsWith("List of devices attached"))
+				.filter(line => line.trim() !== "")
+				.map(line => line.split("\t")[0]);
 
-	private getNextDpadDirectionToItemWithLabel(label: string): DpadButton | null {
-		const parsedXml = this.getParsedXml();
-		const targetElement = this.findElemenWithLabel(parsedXml.hierarchy.node, label);
-		const focusedElement = this.findFocusedElement(parsedXml.hierarchy.node);
-
-		if (!focusedElement || !targetElement) {
-			return null;
-		}
-
-		const focusedRect = this.getScreenElementRect(focusedElement);
-		const targetRect = this.getScreenElementRect(targetElement);
-
-		return this.getDpadDirection(focusedRect, targetRect.x, targetRect.y);
-	}
-
-	/**
-	 * Find the element with the specified label in the UI hierarchy.
-	 *
-	 * @param node - The root node of the UI hierarchy.
-	 * @param label - The label to search for.
-	 * @returns The element node or null if not found.
-	 */
-	private findElemenWithLabel(node: UiAutomatorXmlNode, label: string): UiAutomatorXmlNode | null {
-		if (node["text"] === label || node["content-desc"] === label || node.hint === label) {
-			return node;
-		}
-
-		if (node.node) {
-			if (Array.isArray(node.node)) {
-				for (const childNode of node.node) {
-					const focusedChild = this.findElemenWithLabel(childNode, label);
-					if (focusedChild) {
-						return focusedChild;
-					}
-				}
-			} else {
-				const focusedChild = this.findElemenWithLabel(node.node, label);
-				if (focusedChild) {
-					return focusedChild;
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Find the focused element in the UI hierarchy.
-	 *
-	 * @param node - The root node of the UI hierarchy.
-	 * @returns The focused element node or null if not found.
-	 */
-	private findFocusedElement(node: UiAutomatorXmlNode): UiAutomatorXmlNode | null {
-		if (node["focused"] === "true") {
-			return node;
-		}
-
-		if (node.node) {
-			if (Array.isArray(node.node)) {
-				for (const childNode of node.node) {
-					const focusedChild = this.findFocusedElement(childNode);
-					if (focusedChild) {
-						return focusedChild;
-					}
-				}
-			} else {
-				const focusedChild = this.findFocusedElement(node.node);
-				if (focusedChild) {
-					return focusedChild;
-				}
-			}
-		}
-
-		return null;
-	}
-
-	/**
-	 * Get the dpad direction based on the target coordinates.
-	 *
-	 * @param focusedRect - The focused element.
-	 * @param targetX - The target x coordinate.
-	 * @param targetY - The target y coordinate.
-	 *
-	 * @returns The dpad direction or null if no dpad direction is needed.
-	 */
-	private getDpadDirection(focusedRect: ScreenElementRect, targetX: number, targetY: number): DpadButton | null {
-		// If target matches the focused element's coordinate, it means that we are already on the target.
-		// No need to press any dpad button further.
-		if (focusedRect.x === targetX && focusedRect.y === targetY) {
-			return null;
-		}
-
-		if (focusedRect.x < targetX) {
-			return "DPAD_RIGHT";
-		} else if (focusedRect.x > targetX) {
-			return "DPAD_LEFT";
-		} else if (focusedRect.y < targetY) {
-			return "DPAD_DOWN";
-		} else if (focusedRect.y > targetY) {
-			return "DPAD_UP";
-		}
-
-		// No further valid cases to be covered
-		return null;
-	}
-
-	private async pressDpadInternal(dpadButton: DpadButton): Promise<void> {
-		this.adb("shell", "input", "keyevent", dpadButton);
-	}
-
-	private requireAndroidTv() {
-		if (this.deviceType !== "tv") {
-			throw new ActionableError("This method is only supported on Android TV devices. Let the user about it and stop executing further commands.");
+			return names.map(name => ({
+				deviceId: name,
+				deviceType: this.getDeviceType(name),
+			}));
+		} catch (error) {
+			console.error("Could not execute adb command, maybe ANDROID_HOME is not set?");
+			return [];
 		}
 	}
 }
-
-export const getConnectedDevices = (): string[] => {
-	try {
-		return execFileSync(getAdbPath(), ["devices"])
-			.toString()
-			.split("\n")
-			.filter(line => !line.startsWith("List of devices attached"))
-			.filter(line => line.trim() !== "")
-			.map(line => line.split("\t")[0]);
-	} catch (error) {
-		console.error("Could not execute adb command, maybe ANDROID_HOME is not set?");
-		return [];
-	}
-};

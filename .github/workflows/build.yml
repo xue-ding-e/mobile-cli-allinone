@@ -13,10 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Use Node.js 18
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Use Node.js 22
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: '22'
         cache: 'npm'
 
     - name: Install dependencies
@@ -27,3 +33,24 @@ jobs:
 
     - name: Build
       run: npm run build
+
+#    - name: Install Android SDK
+#      uses: android-actions/setup-android@v3
+#
+#    - name: Create and start Android emulator
+#      run: |
+#        # create avd
+#        echo "y" | sdkmanager "system-images;android-31;google_apis;x86_64"
+#        avdmanager create avd -n test -k "system-images;android-31;google_apis;x86_64" --device "pixel"
+#        # start emulator
+#        sudo ANDROID_AVD_HOME="$HOME/.config/.android/avd" nohup $ANDROID_HOME/emulator/emulator -avd test -no-metrics -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect &
+#        # wait for device
+#        adb wait-for-device
+#        echo "Waiting for sys.boot_completed"
+#        while [[ -z $(adb shell getprop dev.bootcomplete) ]]; do sleep 1; done;
+#      timeout-minutes: 10
+#
+#    - name: Run android tests
+#      run: |
+#        npm test
+

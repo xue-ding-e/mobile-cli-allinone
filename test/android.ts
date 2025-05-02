@@ -1,15 +1,15 @@
 import assert from "assert";
 
-import sharp from "sharp";
+import { PNG } from "../src/png";
+import { AndroidRobot, AndroidDeviceManager } from "../src/android";
 
-import { AndroidRobot, getConnectedDevices } from "../src/android";
-
-const devices = getConnectedDevices();
+const manager = new AndroidDeviceManager();
+const devices = manager.getConnectedDevices();
 const hasOneAndroidDevice = devices.length === 1;
 
 describe("android", () => {
 
-	const android = new AndroidRobot(devices?.[0] || "");
+	const android = new AndroidRobot(devices?.[0]?.deviceId || "");
 
 	it("should be able to get the screen size", async function() {
 		hasOneAndroidDevice || this.skip();
@@ -28,10 +28,10 @@ describe("android", () => {
 		assert.ok(screenshot.length > 64 * 1024);
 
 		// must be a valid png image that matches the screen size
-		const image = sharp(screenshot);
-		const metadata = await image.metadata();
-		assert.equal(metadata.width, screenSize.width);
-		assert.equal(metadata.height, screenSize.height);
+		const image = new PNG(screenshot);
+		const pngSize = image.getDimensions();
+		assert.equal(pngSize.width, screenSize.width);
+		assert.equal(pngSize.height, screenSize.height);
 	});
 
 	it("should be able to list apps", async function() {
@@ -49,49 +49,66 @@ describe("android", () => {
 
 	it("should be able to list elements on screen", async function() {
 		hasOneAndroidDevice || this.skip();
+		await android.terminateApp("com.android.chrome");
 		await android.adb("shell", "input", "keyevent", "HOME");
 		await android.openUrl("https://www.example.com");
 		const elements = await android.getElementsOnScreen();
-		const foundTitle = elements.find(element => element.name?.includes("This domain is for use in illustrative examples in documents"));
+
+		// make sure title (TextView) is present
+		const foundTitle = elements.find(element => element.type === "android.widget.TextView" && element.text?.startsWith("This domain is for use in illustrative examples in documents"));
 		assert.ok(foundTitle, "Title element not found");
 
-		// make sure navbar is present
-		const foundNavbar = elements.find(element => element.label === "Search or type URL" && element.name?.includes("example.com"));
+		// make sure navbar (EditText) is present
+		const foundNavbar = elements.find(element => element.type === "android.widget.EditText" && element.label === "Search or type URL" && element.text === "example.com");
 		assert.ok(foundNavbar, "Navbar element not found");
 
-		// this is an icon, but has accessibility text
-		const foundSecureIcon = elements.find(element => element.name === "" && element.label === "New tab");
-		assert.ok(foundSecureIcon, "Secure icon not found");
+		// this is an icon, but has accessibility label
+		const foundSecureIcon = elements.find(element => element.type === "android.widget.ImageButton" && element.text === "" && element.label === "New tab");
+		assert.ok(foundSecureIcon, "New tab icon not found");
 	});
 
 	it("should be able to send keys and tap", async function() {
 		hasOneAndroidDevice || this.skip();
-		await android.terminateApp("com.android.chrome");
-		await android.launchApp("com.android.chrome");
+		await android.terminateApp("com.google.android.deskclock");
+		await android.adb("shell", "pm", "clear", "com.google.android.deskclock");
+		await android.launchApp("com.google.android.deskclock");
 
-		const elements = await android.getElementsOnScreen();
-		const searchElement = elements.find(e => e.label === "Search or type URL");
-		assert.ok(searchElement !== undefined);
-		await android.tap(searchElement.rect.x + searchElement.rect.width / 2, searchElement.rect.y + searchElement.rect.height / 2);
-
-		await android.sendKeys("never gonna give you up lyrics");
-		await android.pressButton("ENTER");
+		// We probably start at Clock tab
 		await new Promise(resolve => setTimeout(resolve, 3000));
+		let elements = await android.getElementsOnScreen();
+		const timerElement = elements.find(e => e.label === "Timer" && e.type === "android.widget.FrameLayout");
+		assert.ok(timerElement !== undefined);
+		await android.tap(timerElement.rect.x, timerElement.rect.y);
 
-		const elements2 = await android.getElementsOnScreen();
-		const index = elements2.findIndex(e => e.name?.startsWith("We're no strangers to love"));
-		assert.ok(index !== -1);
+		// now we're in Timer tab
+		await new Promise(resolve => setTimeout(resolve, 3000));
+		elements = await android.getElementsOnScreen();
+		const currentTime = elements.find(e => e.text === "00h 00m 00s");
+		assert.ok(currentTime !== undefined, "Expected time to be 00h 00m 00s");
+		await android.sendKeys("123456");
+
+		// now the title has changed with new timer
+		await new Promise(resolve => setTimeout(resolve, 3000));
+		elements = await android.getElementsOnScreen();
+		const newTime = elements.find(e => e.text === "12h 34m 56s");
+		assert.ok(newTime !== undefined, "Expected time to be 12h 34m 56s");
+
+		await android.terminateApp("com.google.android.deskclock");
 	});
 
 	it("should be able to launch and terminate an app", async function() {
 		hasOneAndroidDevice || this.skip();
-		await android.terminateApp("com.android.chrome");
-		await android.launchApp("com.android.chrome");
-		await new Promise(resolve => setTimeout(resolve, 3000));
-		const elements = await android.getElementsOnScreen();
+
+		// kill if running
 		await android.terminateApp("com.android.chrome");
 
-		const searchElement = elements.find(e => e.label === "Search or type URL");
-		assert.ok(searchElement !== undefined);
+		await android.launchApp("com.android.chrome");
+		await new Promise(resolve => setTimeout(resolve, 3000));
+		const processes = await android.listRunningProcesses();
+		assert.ok(processes.includes("com.android.chrome"));
+
+		await android.terminateApp("com.android.chrome");
+		const processes2 = await android.listRunningProcesses();
+		assert.ok(!processes2.includes("com.android.chrome"));
 	});
 });
