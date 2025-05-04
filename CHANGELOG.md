@@ -1,3 +1,7 @@
+## [0.0.15]() (2025-05-04)
+
+* Android: Fixed broken Android screenshots on Windows because of crlf ([#53](https://github.com/mobile-next/mobile-mcp/pull/53/files) by [@hanyuan97](https://github.com/hanyuan97))
+
 ## [0.0.14](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.14) (2025-05-02)
 
 * Server: Fix a bug where xcrun was required, now works on Linux as well ([7fddba7](https://github.com/mobile-next/mobile-mcp/commit/7fddba71af51690cfa76f81154f72c3120ab7f07))
