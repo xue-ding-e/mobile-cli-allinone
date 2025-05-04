@@ -142,7 +142,7 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async getScreenshot(): Promise<Buffer> {
-		return this.adb("shell", "screencap", "-p");
+		return this.adb("exec-out", "screencap", "-p");
 	}
 
 	private collectElements(node: UiAutomatorXmlNode): ScreenElement[] {
