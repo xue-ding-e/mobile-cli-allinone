@@ -195,16 +195,18 @@ export const createMcpServer = (): McpServer => {
 			const elements = await robot!.getElementsOnScreen();
 
 			const result = elements.map(element => {
-				const x = Number((element.rect.x + element.rect.width / 2)).toFixed(1);
-				const y = Number((element.rect.y + element.rect.height / 2)).toFixed(1);
-
 				const out: any = {
 					type: element.type,
 					text: element.text,
 					label: element.label,
 					name: element.name,
 					value: element.value,
-					coordinates: { x, y }
+					coordinates: {
+						x: element.rect.x,
+						y: element.rect.y,
+						width: element.rect.width,
+						height: element.rect.height,
+					},
 				};
 
 				if (element.focused) {
@@ -284,6 +286,8 @@ export const createMcpServer = (): McpServer => {
 			requireRobot();
 
 			try {
+				const screenSize = await robot!.getScreenSize();
+
 				let screenshot = await robot!.getScreenshot();
 				let mimeType = "image/png";
 
@@ -298,7 +302,7 @@ export const createMcpServer = (): McpServer => {
 					trace("ImageMagick is installed, resizing screenshot");
 					const image = Image.fromBuffer(screenshot);
 					const beforeSize = screenshot.length;
-					screenshot = image.resize(Math.floor(pngSize.width / 2))
+					screenshot = image.resize(Math.floor(pngSize.width / screenSize.scale))
 						.jpeg({ quality: 75 })
 						.toBuffer();
 
