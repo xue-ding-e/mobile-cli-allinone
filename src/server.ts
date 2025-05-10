@@ -15,6 +15,24 @@ const getAgentVersion = (): string => {
 	return json.version;
 };
 
+const getLatestAgentVersion = async (): Promise<string> => {
+	const response = await fetch("https://api.github.com/repos/mobile-next/mobile-mcp/tags?per_page=1");
+	const json = await response.json();
+	return json[0].name;
+};
+
+const checkForLatestAgentVersion = async (): Promise<void> => {
+	try {
+		const latestVersion = await getLatestAgentVersion();
+		const currentVersion = getAgentVersion();
+		if (latestVersion !== currentVersion) {
+			trace(`You are running an older version of the agent. Please update to the latest version: ${latestVersion}.`);
+		}
+	} catch (error: any) {
+		// ignore
+	}
+};
+
 export const createMcpServer = (): McpServer => {
 
 	const server = new McpServer({
@@ -351,6 +369,9 @@ export const createMcpServer = (): McpServer => {
 			return `Current device orientation is ${orientation}`;
 		}
 	);
+
+	// async check for latest agent version
+	checkForLatestAgentVersion().then();
 
 	return server;
 };
