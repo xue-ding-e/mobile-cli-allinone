@@ -159,7 +159,7 @@ export class WebDriverAgent {
 	private filterSourceElements(source: SourceTreeElement): Array<ScreenElement> {
 		const output: ScreenElement[] = [];
 
-		const acceptedTypes = ["TextField", "Button", "Switch", "Icon", "SearchField"];
+		const acceptedTypes = ["TextField", "Button", "Switch", "Icon", "SearchField", "StaticText", "Image"];
 
 		if (acceptedTypes.includes(source.type)) {
 			if (source.isVisible === "1" && this.isVisible(source.rect)) {
