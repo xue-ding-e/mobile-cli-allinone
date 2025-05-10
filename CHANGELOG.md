@@ -1,5 +1,9 @@
-## [0.0.15]() (2025-05-04)
+## [0.0.15](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.15) (2025-05-10)
 
+* Server: Detect if there is a new version of the mcp and notify user ([14b015f](https://github.com/mobile-next/mobile-mcp/commit/14b015f29ab47aa1f3ae122a670a58eb7ef51fd8))
+* Server: Instead of returning x,y for tap, return [top,left,width,height] of elements on screen ([3169d2f](https://github.com/mobile-next/mobile-mcp/commit/3169d2f46f0c789e4c3188e137ac645d6f6eb27c))
+* iOS: Fixed coordinates location for iOS with retina display after image scaledown ([3169d2f](https://github.com/mobile-next/mobile-mcp/commit/3169d2f46f0c789e4c3188e137ac645d6f6eb27c))
+* iOS: Added detection of StaticText and Image in mobile_list_elements_on_screen ([debe75b](https://github.com/mobile-next/mobile-mcp/commit/debe75b5c8afcafcef8328201e9886bffdd1f128))
 * Android: Fixed broken Android screenshots on Windows because of crlf ([#53](https://github.com/mobile-next/mobile-mcp/pull/53/files) by [@hanyuan97](https://github.com/hanyuan97))
 
 ## [0.0.14](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.14) (2025-05-02)
