@@ -213,15 +213,9 @@ export class AndroidRobot implements Robot {
 	}
 
 	public async setOrientation(orientation: Orientation): Promise<void> {
-		// Android uses numbers for orientation:
-		// 0 - Portrait
-		// 1 - Landscape
 		const orientationValue = orientation === "portrait" ? 0 : 1;
 
-		// Set orientation using content provider
 		this.adb("shell", "content", "insert", "--uri", "content://settings/system", "--bind", "name:s:user_rotation", "--bind", `value:i:${orientationValue}`);
-
-		// Force the orientation change
 		this.adb("shell", "settings", "put", "system", "accelerometer_rotation", "0");
 	}
 
@@ -251,7 +245,7 @@ export class AndroidRobot implements Robot {
 		const dump = await this.getUiAutomatorDump();
 		const parser = new xml.XMLParser({
 			ignoreAttributes: false,
-			attributeNamePrefix: ""
+			attributeNamePrefix: "",
 		});
 
 		return parser.parse(dump) as UiAutomatorXml;
