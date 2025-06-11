@@ -3,24 +3,38 @@
 This is a [Model Context Protocol (MCP) server](https://github.com/modelcontextprotocol) that enables scalable mobile automation, development through a platform-agnostic interface, eliminating the need for distinct iOS or Android knowledge. You can run it on emulators, simulators, and physical devices (iOS and Android).
 This server allows Agents and LLMs to interact with native iOS/Android applications and devices through structured accessibility snapshots or coordinate-based taps based on screenshots. 
 
-https://github.com/user-attachments/assets/c4e89c4f-cc71-4424-8184-bdbc8c638fa1
-
-
-<p align="center">
+<h4 align="center">
+<a href="https://github.com/mobile-next/mobile-mcp">
+    <img src="https://img.shields.io/github/stars/mobile-next/mobile-mcp" alt="Mobile Next Stars" />
+  </a>  
+ <a href="https://github.com/mobile-next/mobile-mcp">
+    <img src="https://img.shields.io/github/contributors/mobile-next/mobile-mcp?color=green" alt="Mobile Next Downloads" />
+  </a>
   <a href="https://www.npmjs.com/package/@mobilenext/mobile-mcp">
-    <img src="https://img.shields.io/badge/npm-@mobilenext/mobile--mcp-red" alt="npm">
+    <img src="https://img.shields.io/npm/dm/@mobilenext/mobile-mcp?logo=npm&style=flat&color=red" alt="npm">
   </a>
-  <a href="https://github.com/mobile-next/mobile-mcp">
-    <img src="https://img.shields.io/badge/github-repo-black" alt="GitHub repo">
+<a href="https://github.com/mobile-next/mobile-mcp/releases">
+    <img src="https://img.shields.io/github/release/mobile-next/mobile-mcp">
   </a>
+<a href="https://github.com/mobile-next/mobile-mcp/blob/main/LICENSE">
+    <img src="https://img.shields.io/badge/license-Apache 2.0-blue.svg" alt="Mobile MCP is released under the Apache-2.0 License">
+  </a> 
+  
 </p>
+
+<h4 align="center">
+<a href="http://mobilenexthq.com/join-slack">
+    <img src="https://img.shields.io/badge/join-Slack-blueviolet?logo=slack&style=flat" alt="Slack community channel" />
+</a>	
+</p>
+
+https://github.com/user-attachments/assets/c4e89c4f-cc71-4424-8184-bdbc8c638fa1
 
 <p align="center">
     <a href="https://github.com/mobile-next/">
         <img alt="mobile-mcp" src="https://raw.githubusercontent.com/mobile-next/mobile-next-assets/refs/heads/main/mobile-mcp-banner.png" width="600">
     </a>
 </p>
-
 
 ### 🚀 Mobile MCP Roadmap: Building the Future of Mobile
 
