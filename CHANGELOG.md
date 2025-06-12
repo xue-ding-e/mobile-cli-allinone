@@ -1,3 +1,9 @@
+## [0.0.18](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.18) (2025-06-12)
+
+* Server: New support for SSE (Server-Sent-Events) transport, [see wiki for more information](https://github.com/mobile-next/mobile-mcp/wiki/Using-SSE-Transport) ([1b70d40](https://github.com/mobile-next/mobile-mcp/commit/1b70d403cd562a97a0723464f2b286f2fd6eee0a))
+* iOS: Using plutil for `simctl listapps` parsing, might probably fix some parsing issues ([cfba3aa](https://github.com/mobile-next/mobile-mcp/commit/cfba3aaac5beb66d08d1138fe42c924309ede303))
+* Other: We have a new Slack server, join us at http://mobilenexthq.com/join-slack
+
 ## [0.0.17](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.17) (2025-05-16)
 
 * iOS: Fixed parsing of simctl listapps where CFBundleDisplayName contains non-alphanumerical characters ([#59](https://github.com/mobile-next/mobile-mcp/issues/59)) ([bf19771d](https://github.com/mobile-next/mobile-mcp/pull/63/commits/bf19771dcd49444ba4841ec649e3a72a03b54c74))
@@ -34,7 +40,7 @@
 * iOS: go-ios path can be set in env GO_IOS_PATH
 * iOS: Support go-ios that was built locally (no version)
 * iOS: Return bundle display name for apps for better app launch
-* iOS: Fixed finding element coordinates on retina displays 
+* iOS: Fixed finding element coordinates on retina displays
 * iOS: Saving temporary screenshots onto temporary directory ([#19](https://github.com/mobile-next/mobile-mcp/issues/19))
 * iOS: Find elements better by removing off-screen and hidden elements
 * Android: Support for 'adb' under ANDROID_HOME
