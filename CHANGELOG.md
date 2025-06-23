@@ -1,9 +1,15 @@
+## [0.0.20](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.20) (2025-06-23)
+
+* Server: new tool `save_screenshot` which saves the screenshot to disk, to be used by other mcp servers ([#112](https://github.com/mobile-next/mobile-mcp/pull/112))
+* Server: new tool `use_default_device` which picks the only device that is connected, to speed up use ([#112](https://github.com/mobile-next/mobile-mcp/pull/112))
+* iOS: Use wda to grab screenshots for both real devices and simulators ([#115](https://github.com/mobile-next/mobile-mcp/pull/115))
+* Android: Support for utf-8 text in sendKeys, see [wiki page]() for getting started ([#117](https://github.com/mobile-next/mobile-mcp/pull/117))
 
 ## [0.0.19](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.19) (2025-06-16)
 
 * Server: Fixed support for Windsurf, where some tools caused a -32602 error ([#101](https://github.com/mobile-next/mobile-mcp/pull/101)) by [@amebahead](https://github.com/amebahead)
-* iOS: Support for swipe left and right. Support x,y,direction,duration for custom swipes. ([#92](https://github.com/mobile-next/mobile-mcp/pull/92/)) by [@benlmyers](https://github.com/benlmyers)
-* Android: Support for swipe left and right. Support x,y,direction,duration for custom swipes. ([#92](https://github.com/mobile-next/mobile-mcp/pull/92/)) by [@benlmyers](https://github.com/benlmyers)
+* iOS: Support for swipe left and right. Support x,y,direction,duration for custom swipes ([#92](https://github.com/mobile-next/mobile-mcp/pull/92/)) by [@benlmyers](https://github.com/benlmyers)
+* Android: Support for swipe left and right. Support x,y,direction,duration for custom swipes ([#92](https://github.com/mobile-next/mobile-mcp/pull/92/)) by [@benlmyers](https://github.com/benlmyers)
 * Android: Fix for get elements on screen, where uiautomator prints out warnings before the actual xml ([#86](https://github.com/mobile-next/mobile-mcp/pull/86)) by [@wenerme](https://github.com/wenerme)
 
 ## [0.0.18](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.18) (2025-06-12)
