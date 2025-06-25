@@ -109,6 +109,7 @@ export class AndroidRobot implements Robot {
 		return this.adb("shell", "pm", "list", "packages")
 			.toString()
 			.split("\n")
+			.map(line => line.trim())
 			.filter(line => line.startsWith("package:"))
 			.map(line => line.substring("package:".length));
 	}
@@ -375,8 +376,9 @@ export class AndroidDeviceManager {
 			const names = execFileSync(getAdbPath(), ["devices"])
 				.toString()
 				.split("\n")
+				.map(line => line.trim())
+				.filter(line => line !== "")
 				.filter(line => !line.startsWith("List of devices attached"))
-				.filter(line => line.trim() !== "")
 				.map(line => line.split("\t")[0]);
 
 			return names.map(name => ({
