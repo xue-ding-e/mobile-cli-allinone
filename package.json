@@ -1,6 +1,6 @@
 {
   "name": "@mobilenext/mobile-mcp",
-  "version": "0.0.17",
+  "version": "0.0.1",
   "description": "Mobile MCP",
   "repository": {
     "type": "git",
@@ -23,8 +23,6 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.1",
-    "@types/commander": "^2.12.0",
-    "@types/express": "^5.0.3",
     "commander": "^14.0.0",
     "express": "^5.1.0",
     "fast-xml-parser": "^5.0.9",
@@ -34,6 +32,8 @@
     "@eslint/eslintrc": "^3.2.0",
     "@eslint/js": "^9.19.0",
     "@stylistic/eslint-plugin": "^3.0.1",
+    "@types/commander": "^2.12.0",
+    "@types/express": "^5.0.3",
     "@types/mocha": "^10.0.10",
     "@types/node": "^22.13.10",
     "@typescript-eslint/eslint-plugin": "^8.28.0",
