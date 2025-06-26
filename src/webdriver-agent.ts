@@ -31,9 +31,10 @@ export class WebDriverAgent {
 		const url = `http://${this.host}:${this.port}/status`;
 		try {
 			const response = await fetch(url);
-			return response.status === 200;
+			const json = await response.json();
+			return response.status === 200 && json.value?.ready === true;
 		} catch (error) {
-			console.error(`Failed to connect to WebDriverAgent: ${error}`);
+			// console.error(`Failed to connect to WebDriverAgent: ${error}`);
 			return false;
 		}
 	}
