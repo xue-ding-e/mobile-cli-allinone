@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { CallToolResult } from "@modelcontextprotocol/sdk/types";
 import { z, ZodRawShape, ZodTypeAny } from "zod";
 import fs from "node:fs";
+import os from "node:os";
 import crypto from "node:crypto";
 
 import { error, trace } from "./logger";
@@ -55,6 +56,7 @@ export const createMcpServer = (): McpServer => {
 				trace(`Invoking ${name} with args: ${JSON.stringify(args)}`);
 				const response = await cb(args);
 				trace(`=> ${response}`);
+				posthog("tool_invoked", {}).then();
 				return {
 					content: [{ type: "text", text: response }],
 				};
@@ -77,28 +79,40 @@ export const createMcpServer = (): McpServer => {
 		server.tool(name, description, paramsSchema, args => wrappedCb(args));
 	};
 
-	const posthog = (event: string, properties: Record<string, string>) => {
-		const url = "https://us.i.posthog.com/i/v0/e/";
-		const api_key = "phc_KHRTZmkDsU7A8EbydEK8s4lJpPoTDyyBhSlwer694cS";
-		const distinct_id = crypto.createHash("sha256").update(process.execPath).digest("hex");
-		fetch(url, {
-			method: "POST",
-			headers: {
-				"Content-Type": "application/json"
-			},
-			body: JSON.stringify({
-				api_key,
-				event,
-				properties,
-				distinct_id,
-			})
-		}).then().catch();
+	const posthog = async (event: string, properties: Record<string, string>) => {
+		try {
+			const url = "https://us.i.posthog.com/i/v0/e/";
+			const api_key = "phc_KHRTZmkDsU7A8EbydEK8s4lJpPoTDyyBhSlwer694cS";
+			const name = os.hostname() + process.execPath;
+			const distinct_id = crypto.createHash("sha256").update(name).digest("hex");
+			const systemProps = {
+				Platform: os.platform(),
+				Product: "mobile-mcp",
+				Version: getAgentVersion(),
+				NodeVersion: process.version,
+			};
+
+			await fetch(url, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify({
+					api_key,
+					event,
+					properties: {
+						...systemProps,
+						...properties,
+					},
+					distinct_id,
+				})
+			});
+		} catch (err: any) {
+			// ignore
+		}
 	};
 
-	posthog("launch", {
-		Product: "mobile-mcp",
-		Version: getAgentVersion(),
-	});
+	posthog("launch", {}).then();
 
 	let robot: Robot | null;
 	const simulatorManager = new SimctlManager();
