@@ -1,3 +1,9 @@
+## [0.0.21](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.20) (2025-06-27)
+
+* Server: use node: prefixed modules (like node:fs) ([449c498](https://github.com/mobile-next/mobile-mcp/commit/449c498e6e9a3e68aab55ea82f15c296171fc05e))
+* iOS: automatically start WebDriverAgent on simulator if already installed ([#126](https://github.com/mobile-next/mobile-mcp/pull/126))
+* Android: fixed detection of com.mobilenext.devicekit when running mcp on windows ([c11c642](https://github.com/mobile-next/mobile-mcp/commit/c11c6427c71cb7cef6ce87005047df977f6bea8a))
+
 ## [0.0.20](https://github.com/mobile-next/mobile-mcp/releases/tag/0.0.20) (2025-06-23)
 
 * Server: new tool `save_screenshot` which saves the screenshot to disk, to be used by other mcp servers ([#112](https://github.com/mobile-next/mobile-mcp/pull/112))
