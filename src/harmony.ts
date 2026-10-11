@@ -68,6 +68,18 @@ export function harmonyRect(value: string | undefined): ScreenElementRect {
 	if (right < x || bottom < y) {throw new ActionableError("HDC bounds 顺序错误");}
 	return { x, y, width: right - x, height: bottom - y };
 }
+export function pngScreenSize(buffer: Buffer): ScreenSize {
+	const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+	if (buffer.length < 33 || !buffer.subarray(0, 8).equals(signature) ||
+		buffer.readUInt32BE(8) !== 13 || buffer.toString("ascii", 12, 16) !== "IHDR") {
+		throw new ActionableError("HDC 截图缺少有效 PNG IHDR，无法读取屏幕尺寸");
+	}
+	const width = buffer.readUInt32BE(16), height = buffer.readUInt32BE(20);
+	if (width === 0 || height === 0 || width > 0x7fffffff || height > 0x7fffffff) {
+		throw new ActionableError("HDC 截图的 PNG 尺寸无效");
+	}
+	return { width, height, scale: 1 };
+}
 export function harmonyElements(root: HarmonyNode): ScreenElement[] {
 	const result: ScreenElement[] = [];
 	const visit = (node: HarmonyNode, ancestors: HarmonyNode[]): void => {
@@ -105,9 +117,8 @@ export class HarmonyRobot implements Robot {
 	}
 	public async getElementsOnScreen(): Promise<ScreenElement[]> { return harmonyElements(this.readLayout()); }
 	public async getScreenSize(): Promise<ScreenSize> {
-		const rect = harmonyRect(this.readLayout().attributes?.bounds);
-		if (rect.width <= 0 || rect.height <= 0) {throw new ActionableError("屏幕尺寸无效，请先 mobile wake");}
-		return { width: rect.width, height: rect.height, scale: 1 };
+		// UITest 在启动期间可能只返回状态栏等 partial tree，不代表物理显示尺寸。
+		return pngScreenSize(await this.getScreenshot());
 	}
 	private point(x: number, y: number): string[] {
 		if (![x, y].every(Number.isFinite) || x < 0 || y < 0) {throw new ActionableError("点击坐标无效");}

@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import { test, expect } from "@playwright/test";
-import { HarmonyRobot, HarmonyDeviceManager, harmonyRect, harmonyElements, hdcCommand, parseHarmonyTargets, parseBmBundle } from "../src/harmony";
+import { HarmonyRobot, HarmonyDeviceManager, harmonyRect, harmonyElements, pngScreenSize, hdcCommand, parseHarmonyTargets, parseBmBundle } from "../src/harmony";
 import { runFlow } from "../src/flows";
 import { Robot } from "../src/robot";
 import { WebviewManager } from "../src/webview";
@@ -104,4 +104,50 @@ test("dump and screenshot cleanup cannot replace the primary error", async () =>
 });
 test("APK is not silently treated as a native Harmony HAP install", async () => {
 	await expect(new HarmonyRobot("phone").installApp("test.apk")).rejects.toThrow("卓易通");
+});
+
+function pngHeader(width: number, height: number): Buffer {
+	const buffer = Buffer.alloc(33);
+	Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]).copy(buffer);
+	buffer.writeUInt32BE(13, 8);
+	buffer.write("IHDR", 12, "ascii");
+	buffer.writeUInt32BE(width, 16);
+	buffer.writeUInt32BE(height, 20);
+	return buffer;
+}
+
+test("partial UITest tree does not shrink physical Harmony screen size", async () => {
+	const robot = new HarmonyRobot("tablet");
+	let layoutReads = 0;
+	robot.readLayout = () => { layoutReads++; return { attributes: { bounds: "[0,0][1600,87]" } }; };
+	robot.getScreenshot = async () => pngHeader(1600, 2560);
+	await expect(robot.getScreenSize()).resolves.toEqual({ width: 1600, height: 2560, scale: 1 });
+	expect(layoutReads).toBe(0);
+});
+test("PNG IHDR supplies portrait and landscape dimensions", async () => {
+	expect(pngScreenSize(pngHeader(1600, 2560))).toEqual({ width: 1600, height: 2560, scale: 1 });
+	expect(pngScreenSize(pngHeader(2560, 1600))).toEqual({ width: 2560, height: 1600, scale: 1 });
+	const robot = new HarmonyRobot("tablet");
+	robot.getScreenshot = async () => pngHeader(2560, 1600);
+	await expect(robot.getOrientation()).resolves.toBe("landscape");
+});
+
+test("missing or malformed PNG header fails explicitly", async () => {
+	const wrongSignature = pngHeader(1600, 2560);
+	wrongSignature[0] = 0;
+	const wrongChunk = pngHeader(1600, 2560);
+	wrongChunk.write("IDAT", 12, "ascii");
+	const wrongLength = pngHeader(1600, 2560);
+	wrongLength.writeUInt32BE(12, 8);
+	for (const buffer of [Buffer.alloc(0), pngHeader(1, 1).subarray(0, 24), wrongSignature, wrongChunk, wrongLength]) {
+		expect(() => pngScreenSize(buffer)).toThrow("PNG IHDR");
+	}
+	const robot = new HarmonyRobot("tablet");
+	robot.getScreenshot = async () => wrongChunk;
+	await expect(robot.getScreenSize()).rejects.toThrow("PNG IHDR");
+});
+test("PNG IHDR rejects zero and out-of-range dimensions", () => {
+	expect(() => pngScreenSize(pngHeader(0, 2560))).toThrow("PNG 尺寸无效");
+	expect(() => pngScreenSize(pngHeader(1600, 0))).toThrow("PNG 尺寸无效");
+	expect(() => pngScreenSize(pngHeader(0x80000000, 2560))).toThrow("PNG 尺寸无效");
 });
