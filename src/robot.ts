@@ -31,6 +31,8 @@ export interface ScreenElement {
 	value?: string;
 	identifier?: string;
 	rect: ScreenElementRect;
+	// 可点击父容器/图标的位置；保留 rect 用于真实文字布局测量。
+	tapRect?: ScreenElementRect;
 
 	// currently only on android tv
 	focused?: boolean;

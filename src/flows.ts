@@ -34,6 +34,7 @@ export interface FlowContext {
 	getRobot: (device: string) => Robot;
 	webview: WebviewManager;
 	defaultDevice?: string;
+	platform?: "android" | "harmony";
 }
 
 export interface StepResult {
@@ -56,6 +57,9 @@ const dev = (step: FlowStep, ctx: FlowContext): string => {
 // 执行单个步骤,返回人读 info(失败抛异常)
 const runStep = async (step: FlowStep, ctx: FlowContext): Promise<string> => {
 	const wv = ctx.webview;
+	if (ctx.platform === "harmony" && (step.op.startsWith("webview_") || ["assert_route", "assert_eval"].includes(step.op))) {
+		throw new Error("鸿蒙 flow 未实现 WebView/CDP 操作");
+	}
 	switch (step.op) {
 		// ---- 原生 ----
 		case "launch_app": {
@@ -79,8 +83,9 @@ const runStep = async (step: FlowStep, ctx: FlowContext): Promise<string> => {
 			if (!el) {
 				throw new Error(`tap_text 未找到元素: ${t}`);
 			}
-			const cx = Math.round(el.rect.x + el.rect.width / 2);
-			const cy = Math.round(el.rect.y + el.rect.height / 2);
+			const rect = el.tapRect || el.rect;
+			const cx = Math.round(rect.x + rect.width / 2);
+			const cy = Math.round(rect.y + rect.height / 2);
 			await robot.tap(cx, cy);
 			return `tap_text '${t}' @${cx},${cy}`;
 		}

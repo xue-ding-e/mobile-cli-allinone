@@ -7,15 +7,20 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { AndroidRobot, AndroidDeviceManager } from "./android";
+import { execFileSync } from "node:child_process";
+import { AndroidRobot, AndroidDeviceManager, getAdbPath } from "./android";
+import { HarmonyRobot, HarmonyDeviceManager } from "./harmony";
 import { WebviewManager } from "./webview";
 import { runFlow, saveFlow, loadFlow, listFlows, FlowStep, FlowContext } from "./flows";
 
 const STATE_DIR = path.join(os.homedir(), ".mobile-cli");
 const STATE_FILE = path.join(STATE_DIR, "state.json");
 
+type DevicePlatform = "android" | "harmony";
 interface CliState {
 	device?: string;
+	platform?: DevicePlatform;
+	powerOriginal?: { device: string; value: string };
 	pkg?: string;
 	port?: number;
 	recordPid?: number;
@@ -64,6 +69,8 @@ const parseArgs = (argv: string[]): { pos: string[]; opts: Record<string, string
 			const eq = a.indexOf("=");
 			if (eq > 0) {
 				opts[a.slice(2, eq)] = a.slice(eq + 1);
+			} else if (a === "--secret") {
+				opts.secret = true;
 			} else if (i + 1 < argv.length && !argv[i + 1].startsWith("--")) {
 				opts[a.slice(2)] = argv[++i];
 			} else {
@@ -76,18 +83,29 @@ const parseArgs = (argv: string[]): { pos: string[]; opts: Record<string, string
 	return { pos, opts };
 };
 
-// 解析目标设备:--device > handle > 唯一在线设备(自动记住)
+const resolvePlatform = (opts: Record<string, string | boolean>): DevicePlatform => {
+	const value = opts.platform || loadState().platform || "android";
+	if (value !== "android" && value !== "harmony") {return die("--platform 必须是 android 或 harmony");}
+	return value;
+};
+const makeRobot = (device: string, platform: DevicePlatform): AndroidRobot | HarmonyRobot =>
+	platform === "harmony" ? new HarmonyRobot(device) : new AndroidRobot(device);
+
+// 解析目标设备:--device > 对应平台 handle > 唯一在线设备(自动记住)
 const resolveDevice = (opts: Record<string, string | boolean>): string => {
 	if (typeof opts.device == "string") {
 		return opts.device;
 	}
-	const st = loadState();
-	if (st.device) {
-		return st.device;
+	const st = loadState(), platform = resolvePlatform(opts);
+	if (st.device && (st.platform || "android") === platform) {return st.device;}
+	if (platform === "harmony") {
+		const devices = new HarmonyDeviceManager().listTargets().filter(d => d.status === "Connected");
+		if (devices.length === 1) { saveState({ device: devices[0].id, platform }); return devices[0].id; }
+		return die("HDC 需要已授权的目标；USB/无线为独立连接，用 --device 指定。mobile devices --all 查看状态");
 	}
 	const devices = new AndroidDeviceManager().getConnectedDevices();
 	if (devices.length == 1) {
-		saveState({ device: devices[0].deviceId });
+		saveState({ device: devices[0].deviceId, platform: "android" });
 		return devices[0].deviceId;
 	}
 	if (devices.length == 0) {
@@ -109,6 +127,7 @@ const resolvePkg = (opts: Record<string, string | boolean>): string => {
 
 // webview 单命令生命周期:connect→干活→close(单 webview 只允许一个 CDP 连接,正好适配)
 const withWebview = async <T>(opts: Record<string, string | boolean>, fn: (wv: WebviewManager, serial: string) => Promise<T>): Promise<T> => {
+	if (resolvePlatform(opts) === "harmony") {die("wv-* 目前仅支持 Android ADB/CDP；鸿蒙请先用 elements 读取 UITest 控件");}
 	const serial = resolveDevice(opts);
 	const pkg = resolvePkg(opts);
 	const port = typeof opts.port == "string" ? parseInt(opts.port, 10) : (loadState().port || 9222);
@@ -121,17 +140,23 @@ const withWebview = async <T>(opts: Record<string, string | boolean>, fn: (wv: W
 	}
 };
 
-const HELP = `mobile —— 安卓真机/模拟器 CLI(agent 原生;webview 自动连断;run/eval 一段脚本做完 N 步)
+const HELP = `mobile —— Android/鸿蒙真机 CLI（ADB/HDC；run/eval 和 flow 使用同一 Robot）
 
-用法: mobile <命令> [参数] [--device <serial>] [--pkg <包名>]
+用法: mobile <命令> [参数] [--platform android|harmony] [--device <serial>] [--pkg <包名>]
 
 主入口(code-execution,推荐):
   run <script.js>            跑脚本:注入 robot/wv/flows/device/adb,可 return 紧凑结果
   eval "<js>"                内联跑代码,同上注入。例: mobile eval "return (await robot.getScreenSize())"
 
 设备/状态:
-  devices                    列在线安卓设备
-  use <serial> [--pkg 包名]  记住默认设备(+目标App包),之后命令免传
+  devices [--all]            列 ADB/HDC 设备，--all 含 offline/Unauthorized
+  connect <地址> --platform harmony|android
+  use <设备> --platform harmony  持久选择 HDC；USB 和无线地址分开
+  wake / keep-awake [秒数|restore] / power-state  鸿蒙防息屏与状态核验
+  file-send <本地> <设备> / file-recv <设备> <本地>  HDC 文件传输
+  tap-text <文字或identifier>  按实际控件定位点击
+  use <serial> [--pkg 包名]  记住设备和平台；run/eval 注入 hdc/platform（Harmony）
+  鸿蒙尚不支持 wv-* CDP、录屏、强制方向；APK 经卓易通导入，HDC install 仅 HAP。
   state                      查看已记住的 handle
 
 原生(adb,无状态):
@@ -169,15 +194,45 @@ const main = async (): Promise<void> => {
 
 	switch (cmd) {
 		case "devices": {
-			const list = new AndroidDeviceManager().getConnectedDevicesWithDetails();
-			out(list.map(d => ({ id: d.deviceId, name: d.name, version: d.version })));
+			const platform = opts.platform || "all", includeOffline = Boolean(opts.all || opts["include-offline"]);
+			if (!["android", "harmony", "all"].includes(String(platform))) {die("devices --platform android|harmony|all");}
+			const list: unknown[] = [];
+			if (platform !== "harmony") {
+				let raw: string | undefined;
+				try {raw = execFileSync(getAdbPath(), ["devices", "-l"], { windowsHide: true, timeout: 5000 }).toString();} catch {
+					list.push({ platform: "android", status: "unavailable", diagnostic: "ADB 不可用，请检查 adb/ANDROID_HOME" });
+				}
+				if (raw !== undefined) {
+					const online = new AndroidDeviceManager().getConnectedDevicesWithDetails();
+					list.push(...online.map(d => ({ id: d.deviceId, name: d.name, version: d.version, platform: "android", status: "device" })));
+					if (includeOffline) {
+						for (const line of raw.split(/\r?\n/)) {
+							const [id, status] = line.trim().split(/\s+/);
+							if (["offline", "unauthorized"].includes(status)) {list.push({ id, platform: "android", status });}
+						}
+					}
+				}
+			}
+			if (platform !== "android") {
+				try { list.push(...new HarmonyDeviceManager().listTargets().filter(d => includeOffline || d.status === "Connected")); } catch (error) {
+					if (platform === "harmony") {throw error;}
+					list.push({ platform: "harmony", status: "unavailable", diagnostic: "HDC 不可用，请检查 hdc/MOBILE_HDC_PATH" });
+				}
+			}
+			out(list); return;
+		}
+		case "connect": {
+			const id = pos[0] || die("用法: mobile connect <地址或序列号> --platform harmony|android");
+			if (resolvePlatform(opts) === "harmony") {out(new HarmonyDeviceManager().connect(id));} else {out({ platform: "android", result: execFileSync(getAdbPath(), ["connect", id], { timeout: 15000, windowsHide: true }).toString().trim() });}
 			return;
 		}
 		case "use": {
 			if (!pos[0]) {
 				die("用法: mobile use <serial> [--pkg 包名] [--port 9222]");
 			}
-			const patch: CliState = { device: pos[0] };
+			const platform = resolvePlatform(opts);
+			if (platform === "harmony") {new HarmonyDeviceManager().connect(pos[0]);}
+			const patch: CliState = { device: pos[0], platform, pkg: platform === "harmony" ? undefined : loadState().pkg };
 			if (typeof opts.pkg == "string") {
 				patch.pkg = opts.pkg;
 			}
@@ -199,12 +254,14 @@ const main = async (): Promise<void> => {
 			? fs.readFileSync(pos[0] || die("用法: mobile run <script.js>"), "utf8")
 			: (pos[0] || die("用法: mobile eval \"<js>\""));
 		const device = resolveDevice(opts);
-		const robot = new AndroidRobot(device);
+		const platform = resolvePlatform(opts);
+		const robot = makeRobot(device, platform);
 		const wvMgr = new WebviewManager();
 		const st = loadState();
-		// wv:惰性连接的 webview 便捷面(首次用到才 connect,脚本结束统一断开)
+		// wv:惰性连接的 Android webview 便捷面(首次用到才 connect,脚本结束统一断开)
 		let wvConnected = false;
 		const ensureWv = async (): Promise<WebviewManager> => {
+			if (platform === "harmony") {die("鸿蒙当前未实现 WebView CDP，请使用 robot.getElementsOnScreen()");}
 			if (!wvConnected) {
 				const pkg = typeof opts.pkg == "string" ? opts.pkg : (st.pkg || die("脚本用 wv 需 --pkg 或先 mobile use --pkg"));
 				await wvMgr.connect(device, pkg, st.port || 9222);
@@ -221,21 +278,30 @@ const main = async (): Promise<void> => {
 			net: async (ms = 3000) => (await ensureWv()).networkCapture(device, ms),
 		};
 		const flows = {
-			run: async (name: string, stopOnError = true) => runFlow(loadFlow(name), flowCtx(device, wvMgr), stopOnError),
+			run: async (name: string, stopOnError = true) => runFlow(loadFlow(name), flowCtx(device, wvMgr, resolvePlatform(opts)), stopOnError),
 			list: () => listFlows(),
 		};
-		const adb = (...args: string[]): string => robot.adb(...args).toString("utf8");
+		const adb = (...args: string[]): string => {
+			if (!(robot instanceof AndroidRobot)) {throw new Error("鸿蒙请用 hdc(...)，不能把 HDC 端口交给 ADB");}
+			return robot.adb(...args).toString("utf8");
+		};
+		const hdc = (...args: string[]): string => {
+			if (!(robot instanceof HarmonyRobot)) {throw new Error("hdc(...) 仅支持 --platform harmony");}
+			return robot.hdc(...args).toString("utf8");
+		};
 		const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+		let scriptTimer: NodeJS.Timeout | undefined;
 		try {
 			const AsyncFunction = Object.getPrototypeOf(async function() {}).constructor;
-			const fn = new AsyncFunction("robot", "wv", "flows", "adb", "device", "sleep", code);
+			const fn = new AsyncFunction("robot", "wv", "flows", "adb", "device", "sleep", "hdc", "platform", code);
 			const timeoutSec = typeof opts.timeout == "string" ? parseInt(opts.timeout, 10) : 120;
 			const result = await Promise.race([
-				fn(robot, wv, flows, adb, device, sleep),
-				new Promise((_r, rej) => setTimeout(() => rej(new Error(`脚本超时 ${timeoutSec}s`)), timeoutSec * 1000)),
+				fn(robot, wv, flows, adb, device, sleep, hdc, platform),
+				new Promise((_r, rej) => { scriptTimer = setTimeout(() => rej(new Error(`脚本超时 ${timeoutSec}s`)), timeoutSec * 1000); }),
 			]);
 			out(result ?? null);
 		} finally {
+			clearTimeout(scriptTimer);
 			if (wvConnected) {
 				wvMgr.disconnect(device);
 			}
@@ -244,7 +310,7 @@ const main = async (): Promise<void> => {
 	}
 
 	// ===== 原生 adb 薄命令(无状态) =====
-	const robotOf = (): AndroidRobot => new AndroidRobot(resolveDevice(opts));
+	const robotOf = (): AndroidRobot | HarmonyRobot => makeRobot(resolveDevice(opts), resolvePlatform(opts));
 	switch (cmd) {
 		case "apps": {
 			const apps = await robotOf().listApps();
@@ -252,7 +318,11 @@ const main = async (): Promise<void> => {
 			return;
 		}
 		case "launch": {
-			await robotOf().launchApp(pos[0] || die("用法: mobile launch <包名>"));
+			const robot = robotOf(), pkg = pos[0] || die("用法: mobile launch <包名>");
+			if (typeof opts.ability === "string") {
+				if (!(robot instanceof HarmonyRobot)) {return die("--ability 仅用于 Harmony HDC");}
+				await robot.launchAbility(pkg, opts.ability);
+			} else {await robot.launchApp(pkg);}
 			out({ launched: pos[0] });
 			return;
 		}
@@ -270,6 +340,36 @@ const main = async (): Promise<void> => {
 			await robotOf().uninstallApp(pos[0] || die("用法: mobile uninstall <包名>"));
 			out({ uninstalled: pos[0] });
 			return;
+		}
+		case "wake": {
+			const robot = robotOf();
+			if (robot instanceof HarmonyRobot) {out({ result: robot.wake(), platform: "harmony" });} else { robot.adb("shell", "input", "keyevent", "224"); out({ awake: true }); }
+			return;
+		}
+		case "keep-awake": {
+			const robot = robotOf();
+			if (!(robot instanceof HarmonyRobot)) {return die("keep-awake 目前支持鸿蒙 HDC");}
+			const duration = pos[0] === "restore" ? "restore" : Number(pos[0] || 3600);
+			out({ result: robot.keepAwake(duration), powerState: robot.powerState() }); return;
+		}
+		case "power-state": {
+			const robot = robotOf();
+			out({ powerState: robot instanceof HarmonyRobot ? robot.powerState() : robot.adb("shell", "dumpsys", "power").toString() }); return;
+		}
+		case "file-send":
+		case "file-recv": {
+			const robot = robotOf();
+			if (!(robot instanceof HarmonyRobot)) {return die("file-send/file-recv 目前支持鸿蒙 HDC");}
+			if (!pos[0] || !pos[1]) {die("缺本地/设备文件路径");}
+			out({ result: cmd === "file-send" ? robot.fileSend(pos[0], pos[1]) : robot.fileRecv(pos[0], pos[1]) }); return;
+		}
+		case "tap-text": {
+			const robot = robotOf(), text = pos[0] || die("缺要点击的文字或 identifier");
+			const element = (await robot.getElementsOnScreen()).find(e => e.text === text || e.identifier === text || e.label === text);
+			if (!element) {return die("未找到控件: " + text);}
+			const rect = element.tapRect || element.rect;
+			await robot.tap(rect.x + rect.width / 2, rect.y + rect.height / 2);
+			out({ tapped: text, rect }); return;
 		}
 		case "tap": {
 			await robotOf().tap(parseInt(pos[0], 10), parseInt(pos[1], 10));
@@ -300,11 +400,14 @@ const main = async (): Promise<void> => {
 			return;
 		}
 		case "key": {
-			await robotOf().sendKeys(pos[0] || "");
-			if (opts.submit) {
-				await robotOf().pressButton("ENTER" as never);
+			try {
+				await robotOf().sendKeys(pos[0] || "");
+				if (opts.submit) {await robotOf().pressButton("ENTER" as never);}
+			} catch (error) {
+				if (opts.secret) {die("文字输入失败；秘密未记录，请检查设备授权和输入焦点");}
+				throw error;
 			}
-			out({ typed: pos[0] });
+			out(opts.secret ? { typedLength: (pos[0] || "").length } : { typed: pos[0] });
 			return;
 		}
 		case "button": {
@@ -347,6 +450,7 @@ const main = async (): Promise<void> => {
 	// ===== 录屏(唯一跨命令状态,pid 记 handle 文件) =====
 	if (cmd == "record") {
 		const robot = robotOf();
+		if (!(robot instanceof AndroidRobot)) {return die("鸿蒙录屏暂未实现；使用 shot 验证");}
 		const serial = resolveDevice(opts);
 		if (pos[0] == "start") {
 			const remote = typeof opts.path == "string" ? opts.path : `/sdcard/mobile-cli-rec-${Date.now()}.mp4`;
@@ -404,6 +508,7 @@ const main = async (): Promise<void> => {
 			return;
 		}
 		case "wv-pages": {
+			if (resolvePlatform(opts) === "harmony") {die("鸿蒙 WebView CDP 暂未实现");}
 			// 只列页面目标,不建 CDP 会话(forward 后直接 HTTP /json)
 			const serial = resolveDevice(opts);
 			const pkg = resolvePkg(opts);
@@ -424,7 +529,7 @@ const main = async (): Promise<void> => {
 			? JSON.parse(fs.readFileSync(nameOrFile, "utf8"))
 			: loadFlow(nameOrFile);
 		try {
-			out(await runFlow(steps, flowCtx(device, wvMgr), !opts["keep-going"]));
+			out(await runFlow(steps, flowCtx(device, wvMgr, resolvePlatform(opts)), !opts["keep-going"]));
 		} finally {
 			wvMgr.disconnect(device);
 		}
@@ -444,8 +549,9 @@ const main = async (): Promise<void> => {
 	die(`未知命令: ${cmd}(mobile help 看全部)`);
 };
 
-const flowCtx = (device: string, wvMgr: WebviewManager): FlowContext => ({
-	getRobot: (d: string) => new AndroidRobot(d),
+const flowCtx = (device: string, wvMgr: WebviewManager, platform: DevicePlatform): FlowContext => ({
+	getRobot: (d: string) => makeRobot(d, platform),
+	platform,
 	webview: wvMgr,
 	defaultDevice: device,
 });
