@@ -374,11 +374,23 @@ export class AndroidRobot implements Robot {
 
 	public async installApp(path: string): Promise<void> {
 		try {
-			this.adb("install", "-r", path);
+			// MuMu can exit zero after streamed transfer while PackageManager rejects the APK.
+			// Avoid incremental fallback, and treat the final installation receipt as the authority.
+			const output = this.adb("install", "--no-incremental", "-r", path).toString().trim();
+			const lines = output.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+			const failure = lines.find(line => /^(?:Failure\b|Exception\b|[\w.$]*Exception(?:\s|:|$)|Error\b|adb:\s*error:)/i.test(line));
+			if (failure) {
+				throw new ActionableError(output);
+			}
+			// "Success: streamed ..." is only transfer progress, not a successful package install.
+			if (lines[lines.length - 1] !== "Success") {
+				throw new ActionableError(`ADB install did not report terminal Success${output ? `:\n${output}` : " (empty output)"}`);
+			}
 		} catch (error: any) {
+			if (error instanceof ActionableError) {throw error;}
 			const stdout = error.stdout ? error.stdout.toString() : "";
 			const stderr = error.stderr ? error.stderr.toString() : "";
-			const output = (stdout + stderr).trim();
+			const output = [stdout, stderr].filter(Boolean).join("\n").trim();
 			throw new ActionableError(output || error.message);
 		}
 	}
