@@ -27,10 +27,28 @@ export class WebDriverAgent {
 	constructor(private readonly host: string, private readonly port: number) {
 	}
 
+	// Validate both HTTP and WebDriver protocol failures, including commands
+	// whose callers do not consume their response body.
+	private async request(url: string, options?: RequestInit): Promise<Response> {
+		const response = await fetch(url, options);
+		if (!response.ok) {
+			throw new ActionableError(`WebDriver request failed: ${response.status} ${await response.text()}`);
+		}
+		const body = await response.clone().text();
+		if (body) {
+			let json: any;
+			try {json = JSON.parse(body);} catch {throw new ActionableError("Invalid WebDriver JSON response");}
+			if (json.value?.error || (typeof json.status === "number" && json.status !== 0)) {
+				throw new ActionableError(`WebDriver request failed: ${json.value?.message || json.value?.error || body}`);
+			}
+		}
+		return response;
+	}
+
 	public async isRunning(): Promise<boolean> {
 		const url = `http://${this.host}:${this.port}/status`;
 		try {
-			const response = await fetch(url);
+			const response = await this.request(url);
 			const json = await response.json();
 			return response.status === 200 && json.value?.ready === true;
 		} catch (error) {
@@ -41,7 +59,7 @@ export class WebDriverAgent {
 
 	public async createSession(): Promise<string> {
 		const url = `http://${this.host}:${this.port}/session`;
-		const response = await fetch(url, {
+		const response = await this.request(url, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -64,22 +82,31 @@ export class WebDriverAgent {
 
 	public async deleteSession(sessionId: string) {
 		const url = `http://${this.host}:${this.port}/session/${sessionId}`;
-		const response = await fetch(url, { method: "DELETE" });
+		const response = await this.request(url, { method: "DELETE" });
 		return response.json();
 	}
 
 	public async withinSession(fn: (url: string) => Promise<any>) {
 		const sessionId = await this.createSession();
 		const url = `http://${this.host}:${this.port}/session/${sessionId}`;
-		const result = await fn(url);
-		await this.deleteSession(sessionId);
-		return result;
+		let failed = false;
+		try {
+			return await fn(url);
+		} catch (error) {
+			failed = true;
+			throw error;
+		} finally {
+			try {await this.deleteSession(sessionId);} catch (error) {
+				// Preserve the primary operation error if cleanup also fails.
+				if (!failed) {throw error;}
+			}
+		}
 	}
 
 	public async getScreenSize(sessionUrl?: string): Promise<ScreenSize> {
 		if (sessionUrl) {
 			const url = `${sessionUrl}/wda/screen`;
-			const response = await fetch(url);
+			const response = await this.request(url);
 			const json = await response.json();
 			return {
 				width: json.value.screenSize.width,
@@ -89,7 +116,7 @@ export class WebDriverAgent {
 		} else {
 			return this.withinSession(async sessionUrlInner => {
 				const url = `${sessionUrlInner}/wda/screen`;
-				const response = await fetch(url);
+				const response = await this.request(url);
 				const json = await response.json();
 				return {
 					width: json.value.screenSize.width,
@@ -103,7 +130,7 @@ export class WebDriverAgent {
 	public async sendKeys(keys: string) {
 		await this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/wda/keys`;
-			await fetch(url, {
+			await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -132,13 +159,13 @@ export class WebDriverAgent {
 
 		await this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/wda/pressButton`;
-			const response = await fetch(url, {
+			const response = await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
 				},
 				body: JSON.stringify({
-					name: button,
+					name: _map[button as keyof typeof _map],
 				}),
 			});
 
@@ -149,7 +176,7 @@ export class WebDriverAgent {
 	public async tap(x: number, y: number) {
 		await this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/actions`;
-			await fetch(url, {
+			await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -176,7 +203,7 @@ export class WebDriverAgent {
 	public async doubleTap(x: number, y: number) {
 		await this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/actions`;
-			await fetch(url, {
+			await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -209,7 +236,7 @@ export class WebDriverAgent {
 	public async longPress(x: number, y: number, duration: number) {
 		await this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/actions`;
-			await fetch(url, {
+			await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -273,7 +300,7 @@ export class WebDriverAgent {
 
 	public async getPageSource(): Promise<SourceTree> {
 		const url = `http://${this.host}:${this.port}/source/?format=json`;
-		const response = await fetch(url);
+		const response = await this.request(url);
 		const json = await response.json();
 		return json as SourceTree;
 	}
@@ -285,7 +312,7 @@ export class WebDriverAgent {
 
 	public async openUrl(url: string): Promise<void> {
 		await this.withinSession(async sessionUrl => {
-			await fetch(`${sessionUrl}/url`, {
+			await this.request(`${sessionUrl}/url`, {
 				method: "POST",
 				body: JSON.stringify({ url }),
 			});
@@ -294,7 +321,7 @@ export class WebDriverAgent {
 
 	public async getScreenshot(): Promise<Buffer> {
 		const url = `http://${this.host}:${this.port}/screenshot`;
-		const response = await fetch(url);
+		const response = await this.request(url);
 		const json = await response.json();
 		return Buffer.from(json.value, "base64");
 	}
@@ -335,7 +362,7 @@ export class WebDriverAgent {
 			}
 
 			const url = `${sessionUrl}/actions`;
-			const response = await fetch(url, {
+			const response = await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -363,7 +390,7 @@ export class WebDriverAgent {
 			}
 
 			// Clear actions to ensure they complete
-			await fetch(`${sessionUrl}/actions`, {
+			await this.request(`${sessionUrl}/actions`, {
 				method: "DELETE",
 			});
 		});
@@ -396,7 +423,7 @@ export class WebDriverAgent {
 			}
 
 			const url = `${sessionUrl}/actions`;
-			const response = await fetch(url, {
+			const response = await this.request(url, {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
@@ -424,7 +451,7 @@ export class WebDriverAgent {
 			}
 
 			// Clear actions to ensure they complete
-			await fetch(`${sessionUrl}/actions`, {
+			await this.request(`${sessionUrl}/actions`, {
 				method: "DELETE",
 			});
 		});
@@ -433,7 +460,7 @@ export class WebDriverAgent {
 	public async setOrientation(orientation: Orientation): Promise<void> {
 		await this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/orientation`;
-			await fetch(url, {
+			await this.request(url, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -446,7 +473,7 @@ export class WebDriverAgent {
 	public async getOrientation(): Promise<Orientation> {
 		return this.withinSession(async sessionUrl => {
 			const url = `${sessionUrl}/orientation`;
-			const response = await fetch(url);
+			const response = await this.request(url);
 			const json = await response.json();
 			return json.value.toLowerCase() as Orientation;
 		});
