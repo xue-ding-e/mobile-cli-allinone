@@ -19,7 +19,7 @@
 - HarmonyOS 支持控件读取、点击/双击/长按/滑动、文字输入、截图、应用启动/停止、签名 HAP 安装/卸载、文件传输与电源操作。长按时长由 UITest 决定，不支持自定义 duration；`url`、设置方向、录屏尚不支持。读取方向根据截图尺寸判断。
 - HDC `install` 仅接受 `.hap`，不会把 APK 当 HAP 安装。卓易通等兼容环境里的 APK 导入和手机端安装需要单独处理。
 - 默认 iOS 真机 go-ios 路径的 WDA 使用本机 `localhost:8100`，iOS 17+ tunnel 检查使用 `60105`。操作前必须确认该端口对应选定设备；固定端口也适用于 CLI 模拟器 WDA，不提供多台 iOS 设备/模拟器并发隔离保证。
-- CLI 模拟器的 `install` / `launch` / `shot` 不需要 WDA。`shot` 直接从显式 simulator UUID 读取 PNG 并校验头部和尺寸，不选择 `booted` 默认设备，也不会启动或查询共享 WDA。尺寸/元素读取与点击等 UI 控制仍需要正确绑定该模拟器的 WDA；Windows 应通过 SSH 在 Mac 上运行 CLI，工具没有内置远程 simctl 传输。
+- CLI 模拟器的 `install` / `launch` / `shot` 不需要 WDA。`shot` 从显式 simulator UUID 写入本次独占的临时 PNG，读取并校验头部和尺寸后清理；它不依赖部分 simctl 版本行为不一致的 `-` stdout 输出，不选择 `booted` 默认设备，也不会启动或查询共享 WDA。尺寸/元素读取与点击等 UI 控制仍需要正确绑定该模拟器的 WDA；Windows 应通过 SSH 在 Mac 上运行 CLI，工具没有内置远程 simctl 传输。
 - MCP 的设备发现隔离不同驱动的失败；Android / HarmonyOS / iOS 真机的原生操作不要求先安装模拟器用的 mobilecli。MCP 录屏和崩溃报告仍使用 mobilecli，HarmonyOS 不支持这些工具。
 - CLI iOS 不支持 `connect`、`wake`、`power-state`、`keep-awake`、文件传输和录屏。WDA 按键仅支持 `HOME`、`VOLUME_UP`、`VOLUME_DOWN`、`ENTER`，不能照搬 Android 的 `BACK`。CLI 与 MCP 的模拟器驱动分别为 Simctl / WDA 与 mobilecli / agent。
 

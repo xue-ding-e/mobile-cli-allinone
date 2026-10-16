@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, basename, extname } from "node:path";
+import { join, basename, extname, resolve, dirname } from "node:path";
 
 import { trace } from "./logger";
 import { WebDriverAgent } from "./webdriver-agent";
@@ -95,10 +95,20 @@ export class Simctl implements Robot {
 		if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(this.simulatorUuid)) {
 			throw new ActionableError("Simulator screenshot requires an explicit simulator UUID; booted aliases and physical-device serials are not accepted");
 		}
+		let captureDirectory: string | undefined;
+		let operationError: Error | undefined;
 		try {
-			// simctl writes PNG bytes to stdout when the destination is '-'.
-			// Capture the selected simulator directly without starting shared WDA.
-			const image = this.simctl("io", this.simulatorUuid, "screenshot", "--type=png", "-");
+			// Some simctl versions treat '-' as a filename despite their help text.
+			// Use a private output path owned by this capture, without shared WDA.
+			const tempRoot = resolve(tmpdir());
+			const created = mkdtempSync(join(tempRoot, "mobile-sim-shot-"));
+			if (dirname(created) !== tempRoot || !basename(created).startsWith("mobile-sim-shot-")) {
+				throw new ActionableError("Simulator screenshot did not create an owned temporary directory");
+			}
+			captureDirectory = created;
+			const capturePath = join(captureDirectory, "capture.png");
+			this.simctl("io", this.simulatorUuid, "screenshot", "--type=png", capturePath);
+			const image = readFileSync(capturePath);
 			if (image.length < 24 || image.toString("ascii", 12, 16) !== "IHDR") {
 				throw new ActionableError("simctl screenshot returned invalid PNG data");
 			}
@@ -108,9 +118,15 @@ export class Simctl implements Robot {
 			}
 			return image;
 		} catch (error: any) {
-			if (error instanceof ActionableError) {throw error;}
 			const detail = error.stderr ? error.stderr.toString("utf8").trim() : error.message;
-			throw new ActionableError(`simctl screenshot failed for ${this.simulatorUuid}: ${String(detail).slice(0, 4000)}`);
+			operationError = error instanceof ActionableError ? error : new ActionableError(`simctl screenshot failed for ${this.simulatorUuid}: ${String(detail).slice(0, 4000)}`);
+			throw operationError;
+		} finally {
+			if (captureDirectory) {
+				try {rmSync(captureDirectory, { recursive: true, force: true });} catch (cleanupError) {
+					if (operationError) {Object.defineProperty(operationError, "cleanupError", { value: cleanupError });} else {throw new ActionableError(`Failed to clean simulator screenshot temporary directory: ${String(cleanupError).slice(0, 4000)}`);}
+				}
+			}
 		}
 	}
 
