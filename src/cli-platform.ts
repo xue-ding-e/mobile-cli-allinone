@@ -35,9 +35,11 @@ export const capabilities = (platform: DevicePlatform) => ({
 	keepAwake: platform === "harmony",
 	fileTransfer: platform === "harmony",
 	setOrientation: platform !== "harmony",
+	screenshotBackend: platform === "ios-simulator" ? "simctl-explicit-uuid-png" : undefined,
+	screenshotRequiresWda: platform === "ios-simulator" ? false : undefined,
 	buttons: platform.startsWith("ios") ? ["HOME", "VOLUME_UP", "VOLUME_DOWN", "ENTER"] : undefined,
 	requirements: platform === "ios" ? ["go-ios (GO_IOS_PATH)", "WebDriverAgent on localhost:8100 must forward to the selected device (single target)", "iOS 17+: tunnel on localhost:60105"]
-		: platform === "ios-simulator" ? ["macOS with Xcode/xcrun", "booted simulator", "WebDriverAgent on localhost:8100 must forward to the selected device (single target)"]
+		: platform === "ios-simulator" ? ["macOS with Xcode/xcrun", "booted simulator with explicit UUID", "WebDriverAgent on localhost:8100 must target this simulator for size/elements/input; native screenshot and app management do not require WDA"]
 			: platform === "harmony" ? ["HDC (MOBILE_HDC_PATH)", "authorized device"] : ["ADB", "authorized device"],
 	// Capability support is static; this does not assert tool/device readiness.
 });

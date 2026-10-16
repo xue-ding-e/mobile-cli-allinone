@@ -7,6 +7,7 @@ import { trace } from "./logger";
 import { WebDriverAgent } from "./webdriver-agent";
 import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenSize, SwipeDirection, Orientation } from "./robot";
 import { validatePackageName, validateLocale } from "./utils";
+import { PNG } from "./png";
 
 export interface Simulator {
 	name: string;
@@ -91,9 +92,26 @@ export class Simctl implements Robot {
 	}
 
 	public async getScreenshot(): Promise<Buffer> {
-		const wda = await this.wda();
-		return await wda.getScreenshot();
-		// alternative: return this.simctl("io", this.simulatorUuid, "screenshot", "-");
+		if (!/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(this.simulatorUuid)) {
+			throw new ActionableError("Simulator screenshot requires an explicit simulator UUID; booted aliases and physical-device serials are not accepted");
+		}
+		try {
+			// simctl writes PNG bytes to stdout when the destination is '-'.
+			// Capture the selected simulator directly without starting shared WDA.
+			const image = this.simctl("io", this.simulatorUuid, "screenshot", "--type=png", "-");
+			if (image.length < 24 || image.toString("ascii", 12, 16) !== "IHDR") {
+				throw new ActionableError("simctl screenshot returned invalid PNG data");
+			}
+			const dimensions = new PNG(image).getDimensions();
+			if (dimensions.width < 1 || dimensions.height < 1 || dimensions.width > 0x7fffffff || dimensions.height > 0x7fffffff) {
+				throw new ActionableError("simctl screenshot returned invalid PNG dimensions");
+			}
+			return image;
+		} catch (error: any) {
+			if (error instanceof ActionableError) {throw error;}
+			const detail = error.stderr ? error.stderr.toString("utf8").trim() : error.message;
+			throw new ActionableError(`simctl screenshot failed for ${this.simulatorUuid}: ${String(detail).slice(0, 4000)}`);
+		}
 	}
 
 	public async openUrl(url: string) {

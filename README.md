@@ -13,12 +13,13 @@
 | Android 真机 / 模拟器 | 已接入原生操作、脚本、流程、WebView | 已接入 | ADB；设备须在线并授权。WebView 需应用开启调试 |
 | HarmonyOS / OpenHarmony HDC 目标 | 已接入原生操作、脚本、原生流程 | 已接入设备发现、原生操作和原生流程 | HDC、设备调试授权以及设备侧 UITest / bm / aa 等命令；不是 Android ADB |
 | iOS 真机 | 已接入原生操作、脚本、原生流程（`--platform ios`） | 已接入 | go-ios、设备信任/开发配置、WebDriverAgent（WDA）；iOS 17+ 还需 tunnel |
-| iOS Simulator | 已接入 Simctl / WDA（`--platform ios-simulator`） | 已接入 mobilecli / agent | macOS / Xcode / 已启动的模拟器；CLI 与 MCP 驱动不同，不能在 Windows / Linux 本机运行 simctl |
+| iOS Simulator | 已接入 Simctl / WDA（`--platform ios-simulator`）；CLI 截图直接使用 Simctl | 已接入 mobilecli / agent | macOS / Xcode / 已启动的模拟器；CLI 与 MCP 驱动不同，不能在 Windows / Linux 本机运行 simctl |
 
 - Android 专属：`wv-*`、脚本 `wv`、WebView 流程和 CLI 录屏。没有 iOS Safari / WKWebView 或 HarmonyOS WebView CDP 接入。
 - HarmonyOS 支持控件读取、点击/双击/长按/滑动、文字输入、截图、应用启动/停止、签名 HAP 安装/卸载、文件传输与电源操作。长按时长由 UITest 决定，不支持自定义 duration；`url`、设置方向、录屏尚不支持。读取方向根据截图尺寸判断。
 - HDC `install` 仅接受 `.hap`，不会把 APK 当 HAP 安装。卓易通等兼容环境里的 APK 导入和手机端安装需要单独处理。
 - 默认 iOS 真机 go-ios 路径的 WDA 使用本机 `localhost:8100`，iOS 17+ tunnel 检查使用 `60105`。操作前必须确认该端口对应选定设备；固定端口也适用于 CLI 模拟器 WDA，不提供多台 iOS 设备/模拟器并发隔离保证。
+- CLI 模拟器的 `install` / `launch` / `shot` 不需要 WDA。`shot` 直接从显式 simulator UUID 读取 PNG 并校验头部和尺寸，不选择 `booted` 默认设备，也不会启动或查询共享 WDA。尺寸/元素读取与点击等 UI 控制仍需要正确绑定该模拟器的 WDA；Windows 应通过 SSH 在 Mac 上运行 CLI，工具没有内置远程 simctl 传输。
 - MCP 的设备发现隔离不同驱动的失败；Android / HarmonyOS / iOS 真机的原生操作不要求先安装模拟器用的 mobilecli。MCP 录屏和崩溃报告仍使用 mobilecli，HarmonyOS 不支持这些工具。
 - CLI iOS 不支持 `connect`、`wake`、`power-state`、`keep-awake`、文件传输和录屏。WDA 按键仅支持 `HOME`、`VOLUME_UP`、`VOLUME_DOWN`、`ENTER`，不能照搬 Android 的 `BACK`。CLI 与 MCP 的模拟器驱动分别为 Simctl / WDA 与 mobilecli / agent。
 
@@ -269,7 +270,7 @@ npx tsc --noEmit
 npm run test:offline
 ```
 
-`test:offline` 先构建，再仅运行十一个指定文件：PNG、Harmony、ADB 安装结果、原 CLI iOS 路由、WDA 错误处理、MCP 平台路由，以及 Wi-Fi CLI 身份约束、WDA 诊断、本地子进程集成、纯 lockdown 身份与 IPA 安装身份测试。它们不发现或操作真实设备；HTTP 仅连接 loopback。子进程集成测试使用本机 Python 运行合成脚本，没有 Python 时明确跳过该项。**不要在不了解测试内容时直接运行 `npm test`**：默认套件包含 Android / iOS / 模拟器测试，可能读取或改变已连接设备，部分测试在收集阶段就调用平台工具。
+`test:offline` 先构建，再仅运行十二个指定文件：PNG、Harmony、ADB 安装结果、原 CLI iOS 路由、WDA 错误处理、MCP 平台路由，以及 Wi-Fi CLI 身份约束、WDA 诊断、本地子进程集成、纯 lockdown 身份、IPA 安装身份与模拟器原生截图测试。它们不发现或操作真实设备；HTTP 仅连接 loopback。子进程集成测试使用本机 Python 运行合成脚本，没有 Python 时明确跳过该项。**不要在不了解测试内容时直接运行 `npm test`**：默认套件包含 Android / iOS / 模拟器测试，可能读取或改变已连接设备，部分测试在收集阶段就调用平台工具。
 
 问题反馈：[Issues](https://github.com/xue-ding-e/mobile-cli-allinone/issues)。请附提交版本、主机系统、目标平台及脱敏复现信息，区分“源码已实现”“模拟测试通过”和“真机已验证”。
 
