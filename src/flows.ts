@@ -34,7 +34,8 @@ export interface FlowContext {
 	getRobot: (device: string) => Robot;
 	webview: WebviewManager;
 	defaultDevice?: string;
-	platform?: "android" | "harmony";
+	platform?: "android" | "harmony" | "ios" | "ios-simulator";
+	getPlatform?: (device: string) => "android" | "harmony" | "ios" | "ios-simulator";
 }
 
 export interface StepResult {
@@ -57,8 +58,9 @@ const dev = (step: FlowStep, ctx: FlowContext): string => {
 // 执行单个步骤,返回人读 info(失败抛异常)
 const runStep = async (step: FlowStep, ctx: FlowContext): Promise<string> => {
 	const wv = ctx.webview;
-	if (ctx.platform === "harmony" && (step.op.startsWith("webview_") || ["assert_route", "assert_eval"].includes(step.op))) {
-		throw new Error("鸿蒙 flow 未实现 WebView/CDP 操作");
+	if (step.op.startsWith("webview_") || ["assert_route", "assert_eval"].includes(step.op)) {
+		const platform = ctx.getPlatform ? ctx.getPlatform(dev(step, ctx)) : ctx.platform;
+		if (platform && platform !== "android") {throw new Error(`${platform} flow 未实现 WebView/CDP 操作`);}
 	}
 	switch (step.op) {
 		// ---- 原生 ----
