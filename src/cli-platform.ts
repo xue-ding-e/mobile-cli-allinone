@@ -9,6 +9,7 @@ import { IosWifiRobot } from "./ios-wifi-bridge";
 export type DevicePlatform = "android" | "harmony" | "ios" | "ios-simulator";
 export const platforms: DevicePlatform[] = ["android", "harmony", "ios", "ios-simulator"];
 export const makeRobot = (device: string, platform: DevicePlatform, opts: Record<string, string | boolean> = {}) => {
+	if (opts["simulator-wda-config"] !== undefined && platform !== "ios-simulator") {throw new Error("--simulator-wda-config requires ios-simulator; it cannot bind another platform");}
 	switch (platform) {
 		case "android": return new AndroidRobot(device);
 		case "harmony": return new HarmonyRobot(device);
@@ -20,7 +21,11 @@ export const makeRobot = (device: string, platform: DevicePlatform, opts: Record
 			}
 			return new IosRobot(device);
 		}
-		case "ios-simulator": return new Simctl(device);
+		case "ios-simulator": {
+			const config = opts["simulator-wda-config"];
+			if (config !== undefined && (typeof config !== "string" || !config.trim())) {throw new Error("--simulator-wda-config requires a non-empty value");}
+			return new Simctl(device, typeof config === "string" ? config : undefined);
+		}
 	}
 };
 
@@ -37,9 +42,10 @@ export const capabilities = (platform: DevicePlatform) => ({
 	setOrientation: platform !== "harmony",
 	screenshotBackend: platform === "ios-simulator" ? "simctl-explicit-uuid-png" : undefined,
 	screenshotRequiresWda: platform === "ios-simulator" ? false : undefined,
+	uiRequiresOwnedWdaBinding: platform === "ios-simulator" ? true : undefined,
 	buttons: platform.startsWith("ios") ? ["HOME", "VOLUME_UP", "VOLUME_DOWN", "ENTER"] : undefined,
 	requirements: platform === "ios" ? ["go-ios (GO_IOS_PATH)", "WebDriverAgent on localhost:8100 must forward to the selected device (single target)", "iOS 17+: tunnel on localhost:60105"]
-		: platform === "ios-simulator" ? ["macOS with Xcode/xcrun", "booted simulator with explicit UUID", "WebDriverAgent on localhost:8100 must target this simulator for size/elements/input; native screenshot and app management do not require WDA"]
+		: platform === "ios-simulator" ? ["macOS with Xcode/xcrun", "booted simulator with explicit UUID", "size/elements/input require --simulator-wda-config binding an exclusive loopback WDA port to the live installed runner PID/start/code hashes; native screenshot and app management do not require WDA", "no shared localhost:8100 or automatic runner startup"]
 			: platform === "harmony" ? ["HDC (MOBILE_HDC_PATH)", "authorized device"] : ["ADB", "authorized device"],
 	// Capability support is static; this does not assert tool/device readiness.
 });

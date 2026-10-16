@@ -19,7 +19,7 @@
     "watch": "tsc --watch",
     "clean": "rm -rf lib",
     "prepare": "husky",
-    "test:offline": "npm run build && playwright test test/png.ts test/harmony.test.ts test/android-install.test.ts test/cli-ios.test.ts test/wda-errors.test.ts test/server-platform-routing.test.ts test/ios-cli-local-offline.test.ts test/ios-cli-wda-integration-local.test.ts test/wda-local-offline.test.ts test/ios-identity-offline.test.ts test/ios-wifi-install-offline.test.ts test/simulator-screenshot-offline.test.ts"
+    "test:offline": "npm run build && playwright test test/png.ts test/harmony.test.ts test/android-install.test.ts test/cli-ios.test.ts test/wda-errors.test.ts test/server-platform-routing.test.ts test/ios-cli-local-offline.test.ts test/ios-cli-wda-integration-local.test.ts test/wda-local-offline.test.ts test/ios-identity-offline.test.ts test/ios-wifi-install-offline.test.ts test/simulator-screenshot-offline.test.ts test/simulator-wda-binding-offline.test.ts"
   },
   "files": [
     "lib",

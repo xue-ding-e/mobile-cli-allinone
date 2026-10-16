@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join, basename, extname, resolve, dirname } from "node:path";
 
 import { trace } from "./logger";
-import { WebDriverAgent } from "./webdriver-agent";
+import { WebDriverAgent, WebDriverScreenCapture, WebDriverStatusDiagnostic } from "./webdriver-agent";
+import { SimulatorWdaBinding } from "./simulator-wda-binding";
 import { ActionableError, Button, InstalledApp, Robot, ScreenElement, ScreenSize, SwipeDirection, Orientation } from "./robot";
 import { validatePackageName, validateLocale } from "./utils";
 import { PNG } from "./png";
@@ -28,60 +29,44 @@ interface AppInfo {
 }
 
 const TIMEOUT = 30000;
-const WDA_PORT = 8100;
 const MAX_BUFFER_SIZE = 1024 * 1024 * 8;
 
 export class Simctl implements Robot {
 
-	constructor(private readonly simulatorUuid: string) {}
-
-	private async isWdaInstalled(): Promise<boolean> {
-		const apps = await this.listApps();
-		return apps.map(app => app.packageName).includes("com.facebook.WebDriverAgentRunner.xctrunner");
-	}
-
-	private async startWda(): Promise<void> {
-		if (!(await this.isWdaInstalled())) {
-			// wda is not even installed, won't attempt to start it
-			return;
-		}
-
-		trace("Starting WebDriverAgent");
-		const webdriverPackageName = "com.facebook.WebDriverAgentRunner.xctrunner";
-		this.simctl("launch", this.simulatorUuid, webdriverPackageName);
-
-		// now we wait for wda to have a successful status
-		const wda = new WebDriverAgent("localhost", WDA_PORT);
-
-		// wait up to 10 seconds for wda to start
-		const timeout = +new Date() + 10 * 1000;
-		while (+new Date() < timeout) {
-			// cross fingers and see if wda is already running
-			if (await wda.isRunning()) {
-				trace("WebDriverAgent is now running");
-				return;
-			}
-
-			// wait 100ms before trying again
-			await new Promise(resolve => setTimeout(resolve, 100));
-		}
-
-		trace("Could not start WebDriverAgent in time, giving up");
+	private readonly binding?: SimulatorWdaBinding;
+	constructor(private readonly simulatorUuid: string, simulatorWdaConfig?: string) {
+		if (simulatorWdaConfig !== undefined) {this.binding = new SimulatorWdaBinding(simulatorUuid, simulatorWdaConfig);}
 	}
 
 	private async wda(): Promise<WebDriverAgent> {
-		const wda = new WebDriverAgent("localhost", WDA_PORT);
-
-		if (!(await wda.isRunning())) {
-			await this.startWda();
-			if (!(await wda.isRunning())) {
-				throw new ActionableError("WebDriverAgent is not running on simulator, please see https://github.com/mobile-next/mobile-mcp/wiki/");
-			}
-
-			// was successfully started
-		}
-
+		if (!this.binding) {throw new ActionableError("Simulator UI requires --simulator-wda-config with an owned runner bound to the explicit UUID; shared WDA and automatic runner startup are disabled");}
+		const wda = this.binding.createClient();
+		await this.binding.assertHttpIdentity(wda);
 		return wda;
+	}
+
+	public async getWdaStatusDiagnostic(): Promise<WebDriverStatusDiagnostic> {
+		if (!this.binding) {throw new ActionableError("Simulator WDA status requires --simulator-wda-config");}
+		const wda = this.binding.createClient();
+		const diagnostic = await wda.getStatusDiagnostic();
+		if (diagnostic.ok) {
+			try {await this.binding.assertHttpIdentity(wda, diagnostic);} catch (error) {
+				diagnostic.ok = false;
+				diagnostic.protocolError = error instanceof Error ? error.message : String(error);
+			}
+		}
+		return diagnostic;
+	}
+
+	public async captureScreen(): Promise<WebDriverScreenCapture> {
+		const wda = await this.wda();
+		return wda.withinSession(async sessionUrl => ({
+			size: await wda.getScreenSize(sessionUrl),
+			elements: await wda.getElementsOnScreen(sessionUrl),
+			// Preserve the explicit-UUID native screenshot backend, even when
+			// size and elements share this command's owned WDA session.
+			screenshot: await this.getScreenshot(),
+		}));
 	}
 
 	private simctl(...args: string[]): Buffer {

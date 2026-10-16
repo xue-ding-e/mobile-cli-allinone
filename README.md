@@ -18,8 +18,8 @@
 - Android 专属：`wv-*`、脚本 `wv`、WebView 流程和 CLI 录屏。没有 iOS Safari / WKWebView 或 HarmonyOS WebView CDP 接入。
 - HarmonyOS 支持控件读取、点击/双击/长按/滑动、文字输入、截图、应用启动/停止、签名 HAP 安装/卸载、文件传输与电源操作。长按时长由 UITest 决定，不支持自定义 duration；`url`、设置方向、录屏尚不支持。读取方向根据截图尺寸判断。
 - HDC `install` 仅接受 `.hap`，不会把 APK 当 HAP 安装。卓易通等兼容环境里的 APK 导入和手机端安装需要单独处理。
-- 默认 iOS 真机 go-ios 路径的 WDA 使用本机 `localhost:8100`，iOS 17+ tunnel 检查使用 `60105`。操作前必须确认该端口对应选定设备；固定端口也适用于 CLI 模拟器 WDA，不提供多台 iOS 设备/模拟器并发隔离保证。
-- CLI 模拟器的 `install` / `launch` / `shot` 不需要 WDA。`shot` 从显式 simulator UUID 写入本次独占的临时 PNG，读取并校验头部和尺寸后清理；它不依赖部分 simctl 版本行为不一致的 `-` stdout 输出，不选择 `booted` 默认设备，也不会启动或查询共享 WDA。尺寸/元素读取与点击等 UI 控制仍需要正确绑定该模拟器的 WDA；Windows 应通过 SSH 在 Mac 上运行 CLI，工具没有内置远程 simctl 传输。
+- 默认 iOS 真机 go-ios 路径的 WDA 使用本机 `localhost:8100`，iOS 17+ tunnel 检查使用 `60105`。操作前必须确认该端口对应选定设备。CLI 模拟器不使用该共享端口，UI 控制必须提供独占 Runner 的显式绑定。
+- CLI 模拟器的 `install` / `launch` / `shot` 不需要 WDA。`shot` 从显式 simulator UUID 写入本次独占的临时 PNG，读取并校验头部和尺寸后清理；它不依赖部分 simctl 版本行为不一致的 `-` stdout 输出，不选择 `booted` 默认设备，也不会启动或查询共享 WDA。尺寸/元素读取与点击等 UI 控制需要 `--simulator-wda-config`；缺失或身份不符时直接失败。Windows 应通过 SSH 在 Mac 上运行 CLI，工具没有内置远程 simctl 传输。
 - MCP 的设备发现隔离不同驱动的失败；Android / HarmonyOS / iOS 真机的原生操作不要求先安装模拟器用的 mobilecli。MCP 录屏和崩溃报告仍使用 mobilecli，HarmonyOS 不支持这些工具。
 - CLI iOS 不支持 `connect`、`wake`、`power-state`、`keep-awake`、文件传输和录屏。WDA 按键仅支持 `HOME`、`VOLUME_UP`、`VOLUME_DOWN`、`ENTER`，不能照搬 Android 的 `BACK`。CLI 与 MCP 的模拟器驱动分别为 Simctl / WDA 与 mobilecli / agent。
 
@@ -60,7 +60,7 @@ CLI 的目标平台由驱动决定；能启动 Node.js 不代表主机具备目�
 - **Android**：安装 Android SDK Platform Tools，让 `adb` 可用，或设置 `ANDROID_HOME` 指向 SDK。手机开启调试并确认主机授权；模拟器先启动并确保出现在 `adb devices` 中。无线连接需要设备端预先配置，CLI 不代替配对和授权。
 - **HarmonyOS**：安装适合主机的 HDC。可通过 `MOBILE_HDC_PATH` 指定可执行文件完整路径；未设置时，Windows 会尝试 HiSuite 的固定路径，随后回退到 PATH 中的 `hdc`。设备需支持相应 UITest 等命令并已授权。USB 标识和无线 `host:port` 是独立连接目标。
 - **iOS 真机**：准备 go-ios，命令默认名为 `ios`，或以 `GO_IOS_PATH` 指定路径。先完成设备信任及所需开发配置、WDA 安装/运行、到本机 8100 的端口转发；iOS 17+ 还需运行 tunnel。程序检查这些前置状态，不会自动替你签名或部署 WDA。不同主机与 iOS 版本组合需自行验收。
-- **iOS Simulator**：需要 macOS、Xcode 和已启动（Booted）的模拟器。CLI 用 `xcrun simctl` 发现和管理应用，UI 操作还需本机 8100 的 WDA；已安装 WDA runner 时会尝试启动，但不会自动安装/签名它。MCP 则使用 mobilewright 依赖提供的 mobilecli，可用 `MOBILECLI_PATH` 指定二进制路径，首次原生操作可能检测并安装模拟器 agent。不要将 mobilecli 的跨平台二进制名称理解为 Windows 可运行 iOS Simulator。
+- **iOS Simulator**：需要 macOS、Xcode 和已启动（Booted）的模拟器。CLI 用 `xcrun simctl` 发现和管理应用，UI 操作还需预先建立并绑定独占 WDA Runner；CLI 不会启动、安装或签名 Runner。MCP 则使用 mobilewright 依赖提供的 mobilecli，可用 `MOBILECLI_PATH` 指定二进制路径，首次原生操作可能检测并安装模拟器 agent。不要将 mobilecli 的跨平台二进制名称理解为 Windows 可运行 iOS Simulator。
 
 ## CLI 快速开始
 
@@ -102,16 +102,27 @@ node lib/cli.js elements
 node lib/cli.js shot ./ios-screen.png
 ```
 
-iOS Simulator 示例（仅 macOS，已启动模拟器并配置 WDA）：
+iOS Simulator 示例（仅 macOS，已启动模拟器）：
 
 ```sh
 node lib/cli.js devices --platform ios-simulator --all
-node lib/cli.js use SIMULATOR_UUID --platform ios-simulator
-node lib/cli.js launch com.example.app
-node lib/cli.js eval "return await robot.getScreenSize()"
+node lib/cli.js launch com.example.app --platform ios-simulator --device SIMULATOR_UUID
+node lib/cli.js shot /absolute/screen.png --platform ios-simulator --device SIMULATOR_UUID
+node lib/cli.js wda-status --platform ios-simulator --device SIMULATOR_UUID --simulator-wda-config /private/simulator-wda.json
+node lib/cli.js eval "return await robot.getScreenSize()" --platform ios-simulator --device SIMULATOR_UUID --simulator-wda-config /private/simulator-wda.json
 ```
 
 `--all` 可显示未启动的模拟器，不代表它可以立即执行操作。CLI 不会自动创建/启动模拟器，也不会创建 iOS 无线连接或部署 WDA。模拟器安装使用适配模拟器的 `.app`，也支持顶层包含 `.app` 的 `.zip`；不能将真机 IPA 当作模拟器应用通用安装。
+
+### Simulator 的独占 WDA 绑定
+
+`--simulator-wda-config` 只接受显式 `--platform ios-simulator --device <完整 UUID>`。私有 JSON 的 `schemaVersion` 为 `1`，`simulatorUuid` 必须与命令一致，`wdaOrigin` 为独占数字 loopback HTTP origin，须显式端口且不能使用共享 `8100`。配置不写入全局默认，也不适用于物理 iOS 的 `--ios-config`。
+
+`runner` 必填 `bundleId`（以 `.xctrunner` 结尾）、`pid`、`processStart`（实际 `ps -p PID -o lstart=`）、`executableSha256`、`wdaProductBundleIdentifier` 和 `codeFiles`。每项代码包含安装 bundle 内的 `relativePath` 与小写 `sha256`；应从本次独占构建枚举完整 Mach-O 清单并安装回读。至少包含 XCTest 主执行文件和 `WebDriverAgentLib.framework/WebDriverAgentLib`，两项还须提供实际加载的绝对 `mappedPath`。XCTest 可从该构建的 DerivedData 加载 framework，所以同时核对安装和实际映射的字节。不要把配置、运行路径或设备身份提交到公共源码。
+
+每条 WDA HTTP 请求（包括 session 清理）前，CLI 使用 `lsof` 核对端口唯一 listener、`ps` 核对 PID/启动时间/执行文件，并把进程关联到指定 UUID 的 `simctl get_app_container`；随后核对安装代码与实际加载代码哈希。HTTP `/status` 的 ready、build product 与 `/wda/device/info` 的 `isSimulator` 仅作补充检查；device info 的 vendor UUID 不能当作 simulator UUID。任一检查失败均拒绝请求，不接管新 Runner、不自动恢复。
+
+Simulator `wda-status` 包含上述本机取证以及 `/status`、`/wda/device/info` 两个只读请求；`run/eval` 的 `robot.captureScreen()` 在自己创建的一个 session 内读取尺寸与元素，PNG 仍走显式 UUID 的原生截图。坐标使用 WDA points，截图尺寸为像素。检查与 HTTP 之间不是原子绑定；静态回执、进程存活或一次 ready 均不能代替实际 UI 验证。
 
 ### 可选 iOS Wi-Fi CLI 配置
 

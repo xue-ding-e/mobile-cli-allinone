@@ -31,6 +31,7 @@ export interface WebDriverScreenCapture {
 export interface WebDriverAgentOptions {
 	requestTimeoutMs?: number;
 	protocol?: "http:" | "https:";
+	verifyTarget?: () => void | Promise<void>;
 }
 
 interface WebDriverResponse {
@@ -78,8 +79,10 @@ export class WebDriverAgent {
 
 	private readonly baseUrl: string;
 	private readonly requestTimeoutMs: number;
+	private readonly verifyTarget?: () => void | Promise<void>;
 
 	constructor(host: string, port: number, options: WebDriverAgentOptions = {}) {
+		this.verifyTarget = options.verifyTarget;
 		const protocol = options.protocol ?? "http:";
 		if (protocol !== "http:" && protocol !== "https:") {
 			throw new ActionableError("WebDriverAgent requires HTTP or HTTPS");
@@ -116,6 +119,9 @@ export class WebDriverAgent {
 		if (url.origin !== this.baseUrl || url.username || url.password) {
 			throw new ActionableError("WebDriverAgent requests must use the configured origin");
 		}
+		// An exclusive Simulator binding is checked before every request,
+		// including cleanup; never delete a session on a replacement runner.
+		await this.verifyTarget?.();
 		const controller = new AbortController();
 		const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs);
 		const abortFromCaller = () => controller.abort();

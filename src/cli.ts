@@ -12,6 +12,7 @@ import { AndroidRobot, AndroidDeviceManager, getAdbPath } from "./android";
 import { HarmonyRobot, HarmonyDeviceManager } from "./harmony";
 import { DevicePlatform, platforms, makeRobot, capabilities, listIosDevices } from "./cli-platform";
 import { IosWifiRobot } from "./ios-wifi-bridge";
+import { Simctl } from "./iphone-simulator";
 import { WebviewManager } from "./webview";
 import { runFlow, saveFlow, loadFlow, listFlows, FlowStep, FlowContext } from "./flows";
 
@@ -97,6 +98,7 @@ const resolveDevice = (opts: Record<string, string | boolean>): string => {
 	}
 	const st = loadState(), platform = resolvePlatform(opts);
 	if (opts["ios-config"] !== undefined) {return die("iOS Wi-Fi requires explicit --device <UDID>; no global default is selected");}
+	if (opts["simulator-wda-config"] !== undefined) {return die("Simulator WDA requires explicit --device <UUID>; no global default is selected");}
 	if (st.device && (st.platform || "android") === platform) {return st.device;}
 	if (platform === "harmony") {
 		const devices = new HarmonyDeviceManager().listTargets().filter(d => d.status === "Connected");
@@ -160,12 +162,16 @@ const HELP = `mobile —— Android/鸿蒙/iOS CLI（复用 ADB/HDC/go-ios/Simct
   配置绑定现有无线配对/认证桥与 WDA；不启动代理、不配对、不构建签名
   --wda-url <origin> 可核对配置中的同一 WDA 地址，不能静默改目标
   probe / wda-status / devices / screen-size / elements / shot / tap-text
-  wda-status 单次只读 GET /status，保真实 HTTP/body/error/elapsed
+  Wi-Fi wda-status 单次只读 GET /status，保真实 HTTP/body/error/elapsed
+  Simulator wda-status 先核本机绑定，再读 /status 与 /wda/device/info
   iOS 批量读取：run/eval 中 await robot.captureScreen() 返回 {size,elements,screenshot:Buffer}
   captureScreen 的三项读取共享自己创建的 WDA session，完成或失败均清理
   Wi-Fi bridge: launch <bundle> / install <ipa> --pkg <bundle>
   Wi-Fi bridge 暂不支持 apps/stop/uninstall；原 go-ios 后端保留
   iOS 真机用 --platform ios；模拟器用 --platform ios-simulator（macOS/Xcode）。
+  模拟器尺寸/元素/点击需 --device <UUID> --simulator-wda-config <private.json>。
+  该配置绑定独占端口、当前 Runner PID/start 和已安装代码哈希；不使用共享 8100、不启动 Runner。
+  模拟器 shot/install/launch 不需要 WDA；captureScreen 的 PNG 仍走原生 Simctl。
   默认 go-ios 的 UI 操作需 WDA localhost:8100；iOS 17+ 真机还需 tunnel localhost:60105。
   iOS 不支持 wv-*、录屏、connect、wake/power-state、HDC 文件传输。
   connect <地址> --platform harmony|android
@@ -219,6 +225,12 @@ const main = async (): Promise<void> => {
 		if (typeof opts.device !== "string" || !opts.device.trim()) {return die("iOS Wi-Fi requires explicit --device <UDID>");}
 		if (cmd === "use") {return die("iOS Wi-Fi uses explicit --device; global default is not changed");}
 	}
+	if (opts["simulator-wda-config"] !== undefined) {
+		if (opts.platform !== "ios-simulator") {return die("--simulator-wda-config requires explicit --platform ios-simulator");}
+		if (typeof opts["simulator-wda-config"] !== "string" || !opts["simulator-wda-config"].trim()) {return die("--simulator-wda-config requires a non-empty value");}
+		if (typeof opts.device !== "string" || !opts.device.trim()) {return die("Simulator WDA requires explicit --device <UUID>");}
+		if (cmd === "use") {return die("Simulator WDA uses explicit --device; global default is not changed");}
+	}
 	const selectedPlatform = cmd === "devices" ? "android" : resolvePlatform(opts);
 	if (selectedPlatform.startsWith("ios") && ["connect", "wake", "keep-awake", "power-state", "file-send", "file-recv", "record"].includes(cmd)) {
 		die(`${selectedPlatform} 不支持 ${cmd}；用 capabilities 查看能力`);
@@ -230,8 +242,11 @@ const main = async (): Promise<void> => {
 		case "probe":
 		case "wda-status": {
 			const robot = makeRobot(resolveDevice(opts), resolvePlatform(opts), opts);
-			if (!(robot instanceof IosWifiRobot)) {return die(`${cmd} requires --platform ios --ios-config`);}
-			if (cmd === "probe") {out(await robot.probe()); return;}
+			if (cmd === "probe") {
+				if (!(robot instanceof IosWifiRobot)) {return die("probe requires --platform ios --ios-config");}
+				out(await robot.probe()); return;
+			}
+			if (!(robot instanceof IosWifiRobot) && !(robot instanceof Simctl)) {return die("wda-status requires explicit iOS Wi-Fi or owned Simulator WDA configuration");}
 			const diagnostic = await robot.getWdaStatusDiagnostic(); out(diagnostic);
 			if (!diagnostic.ok) {process.exitCode = 1;}
 			return;
@@ -332,7 +347,7 @@ const main = async (): Promise<void> => {
 			net: async (ms = 3000) => (await ensureWv()).networkCapture(device, ms),
 		};
 		const flows = {
-			run: async (name: string, stopOnError = true) => runFlow(loadFlow(name), flowCtx(device, wvMgr, resolvePlatform(opts), opts), stopOnError),
+			run: async (name: string, stopOnError = true) => runFlow(loadFlow(name), flowCtx(device, wvMgr, resolvePlatform(opts), opts, robot), stopOnError),
 			list: () => listFlows(),
 		};
 		const adb = (...args: string[]): string => {
@@ -364,7 +379,11 @@ const main = async (): Promise<void> => {
 	}
 
 	// ===== 原生 adb 薄命令(无状态) =====
-	const robotOf = () => makeRobot(resolveDevice(opts), resolvePlatform(opts), opts);
+	let boundSimulatorRobot: ReturnType<typeof makeRobot> | undefined;
+	const robotOf = () => {
+		if (opts["simulator-wda-config"]) {return boundSimulatorRobot ??= makeRobot(resolveDevice(opts), resolvePlatform(opts), opts);}
+		return makeRobot(resolveDevice(opts), resolvePlatform(opts), opts);
+	};
 	switch (cmd) {
 		case "apps": {
 			const apps = await robotOf().listApps();
@@ -605,12 +624,20 @@ const main = async (): Promise<void> => {
 	die(`未知命令: ${cmd}(mobile help 看全部)`);
 };
 
-const flowCtx = (device: string, wvMgr: WebviewManager, platform: DevicePlatform, opts: Record<string, string | boolean>): FlowContext => ({
-	getRobot: (d: string) => makeRobot(d, platform, opts),
-	platform,
-	webview: wvMgr,
-	defaultDevice: device,
-});
+const flowCtx = (device: string, wvMgr: WebviewManager, platform: DevicePlatform, opts: Record<string, string | boolean>, existingRobot?: ReturnType<typeof makeRobot>): FlowContext => {
+	// Freeze one owned Runner receipt for the entire CLI invocation/flow.
+	// A step cannot switch devices or reload a replacement Runner mid-command.
+	const boundRobot = opts["simulator-wda-config"] ? existingRobot ?? makeRobot(device, platform, opts) : undefined;
+	return {
+		getRobot: (d: string) => {
+			if (boundRobot && d !== device) {throw new Error("Simulator WDA flow step does not match the explicit simulator UUID");}
+			return boundRobot ?? makeRobot(d, platform, opts);
+		},
+		platform,
+		webview: wvMgr,
+		defaultDevice: device,
+	};
+};
 
 main().catch(e => {
 	process.stderr.write("错误: " + (e && e.message || String(e)) + "\n");
