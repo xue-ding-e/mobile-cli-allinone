@@ -2,7 +2,7 @@
 
 由 [xue-ding-e](https://github.com/xue-ding-e) 维护的移动设备自动化工具。以 **CLI 的 `run` / `eval` 为主要脚本入口**，提供原生界面操作、Android WebView CDP 调试和 JSON 流程重放；另提供 MCP 服务供支持 MCP 的客户端使用。
 
-仓库正从 `mobile-mcp-allinone` 更名为 `mobile-cli-allinone`；以下仓库链接和克隆示例使用目标名称，远端更名完成前请使用现有仓库地址。npm 包名 `@xue-ding-e/mobile-mcp-allinone`、MCP registry ID `io.github.xue-ding-e/mobile-mcp-allinone` 和 `mcp-server-mobile` 命令暂保持兼容，不表示发布了新包。
+仓库已从 `mobile-mcp-allinone` 更名为 `mobile-cli-allinone`，多平台源码与线性历史已推送到本仓库；以下链接和克隆示例使用当前名称。npm 包名 `@xue-ding-e/mobile-mcp-allinone`、MCP registry ID `io.github.xue-ding-e/mobile-mcp-allinone` 和 `mcp-server-mobile` 命令暂保持兼容，不表示发布了新包。
 
 不同平台有不同的驱动和能力，不能把 Android 命令直接套到其他平台。下表描述当前源码接入情况，不代表已在所有系统、设备和版本上完成真机验收。
 
