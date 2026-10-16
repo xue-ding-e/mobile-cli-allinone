@@ -22,6 +22,12 @@ export interface SourceTree {
 	value: SourceTreeElement;
 }
 
+export interface WebDriverScreenCapture {
+	size: ScreenSize;
+	elements: ScreenElement[];
+	screenshot: Buffer;
+}
+
 export interface WebDriverAgentOptions {
 	requestTimeoutMs?: number;
 	protocol?: "http:" | "https:";
@@ -486,14 +492,17 @@ export class WebDriverAgent {
 		return output;
 	}
 
-	public async getPageSource(): Promise<SourceTree> {
-		const url = `${this.baseUrl}/source/?format=json`;
+	public async getPageSource(sessionUrl?: string): Promise<SourceTree> {
+		if (!sessionUrl) {
+			return this.withinSession(url => this.getPageSource(url));
+		}
+		const url = `${sessionUrl}/source?format=json`;
 		const json = await this.requestJson(url);
 		return json as SourceTree;
 	}
 
-	public async getElementsOnScreen(): Promise<ScreenElement[]> {
-		const source = await this.getPageSource();
+	public async getElementsOnScreen(sessionUrl?: string): Promise<ScreenElement[]> {
+		const source = await this.getPageSource(sessionUrl);
 		return this.filterSourceElements(source.value);
 	}
 
@@ -506,10 +515,22 @@ export class WebDriverAgent {
 		});
 	}
 
-	public async getScreenshot(): Promise<Buffer> {
-		const url = `${this.baseUrl}/screenshot`;
+	public async getScreenshot(sessionUrl?: string): Promise<Buffer> {
+		if (!sessionUrl) {
+			return this.withinSession(url => this.getScreenshot(url));
+		}
+		const url = `${sessionUrl}/screenshot`;
 		const json = await this.requestJson(url);
 		return Buffer.from(json.value, "base64");
+	}
+
+	public async captureScreen(): Promise<WebDriverScreenCapture> {
+		// One owned session spans the ordered reads; never borrow a server session.
+		return this.withinSession(async sessionUrl => ({
+			size: await this.getScreenSize(sessionUrl),
+			elements: await this.getElementsOnScreen(sessionUrl),
+			screenshot: await this.getScreenshot(sessionUrl),
+		}));
 	}
 
 	public async swipe(direction: SwipeDirection): Promise<void> {

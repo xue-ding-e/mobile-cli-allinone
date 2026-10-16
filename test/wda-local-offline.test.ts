@@ -182,7 +182,7 @@ const commandCases: Array<{ name: string; path: string; run: (client: WebDriverA
 	{ name: "orientation read", path: "/orientation", run: client => client.getOrientation() },
 	{ name: "orientation write", path: "/orientation", run: client => client.setOrientation("portrait") },
 	{ name: "openUrl", path: "/url", run: client => client.openUrl("https://example.invalid") },
-	{ name: "source", path: "/source/?format=json", run: client => client.getPageSource() },
+	{ name: "source", path: "/source?format=json", run: client => client.getPageSource() },
 	{ name: "screenshot", path: "/screenshot", run: client => client.getScreenshot() },
 ];
 for (const command of commandCases) {
@@ -228,8 +228,8 @@ test("successful JSON envelopes keep screen, source, screenshot, orientation and
 			return;
 		}
 		const value = request.path.endsWith("/screen") ? { screenSize: { width: 390, height: 844 }, scale: 3 }
-			: request.path === "/screenshot" ? Buffer.from("png content").toString("base64")
-				: request.path.startsWith("/source") ? { type: "Application", rect: { x: 0, y: 0, width: 390, height: 844 } }
+			: request.path === "/session/test-session/screenshot" ? Buffer.from("png content").toString("base64")
+				: request.path === "/session/test-session/source?format=json" ? { type: "Application", rect: { x: 0, y: 0, width: 390, height: 844 } }
 					: request.path.endsWith("/orientation") ? "PORTRAIT"
 						: request.path === "/status" ? { ready: true } : null;
 		json(response, { value, status: 0 });
@@ -379,4 +379,107 @@ test("refused loopback connections retain the actual transport cause code", asyn
 	expect(diagnostic).toMatchObject({ httpStatus: null, rawBody: "", ready: false, ok: false, protocolError: null });
 	expect(diagnostic.networkError).toContain("ECONNREFUSED");
 	expect(diagnostic.networkError?.length).toBeLessThanOrEqual(4096 + " [truncated]".length);
+});
+
+
+const capturePng = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl1sAAAAASUVORK5CYII=", "base64");
+const captureTree = {
+	type: "Application", rawIdentifier: null, name: "Fixture", value: null, label: "Fixture",
+	rect: { x: 0, y: 0, width: 390, height: 844 }, isVisible: "1",
+	children: [{ type: "Button", rawIdentifier: "test-button", name: "Open", value: null, label: "Open",
+		rect: { x: 10, y: 20, width: 100, height: 40 }, isVisible: "1", isEnabled: "1" }],
+};
+
+async function strictCaptureWda(failPath?: string, cleanupFailure = false) {
+	return mockWda((request, response) => {
+		if (request.method === "POST" && request.path === "/session") {
+			json(response, { sessionId: "test-session", value: { sessionId: "test-session" } });
+			return;
+		}
+		if (request.method === "DELETE" && request.path === "/session/test-session") {
+			json(response, { value: cleanupFailure ? { error: "cleanup refused" } : null }, cleanupFailure ? 500 : 200);
+			return;
+		}
+		if (request.path === failPath) {
+			json(response, { sessionId: "test-session", value: { error: "unknown command", message: "capture step rejected" } }, 404);
+			return;
+		}
+		if (request.method === "GET" && request.path === "/session/test-session/wda/screen") {
+			json(response, { sessionId: "test-session", value: { screenSize: { width: 390, height: 844 }, scale: 3 } });
+			return;
+		}
+		if (request.method === "GET" && request.path === "/session/test-session/source?format=json") {
+			json(response, { sessionId: "test-session", value: captureTree });
+			return;
+		}
+		if (request.method === "GET" && request.path === "/session/test-session/screenshot") {
+			json(response, { sessionId: "test-session", value: capturePng.toString("base64") });
+			return;
+		}
+		// Deliberately reject trailing slashes, sessionless endpoints and stale IDs.
+		json(response, { sessionId: null, value: { error: "unknown command", message: "Unregistered WDA route" } }, 404);
+	});
+}
+
+test("source without an explicit session creates its own session and uses the exact registered path", async () => {
+	const { client, requests } = await strictCaptureWda();
+	await expect(client.getPageSource()).resolves.toMatchObject({ value: captureTree });
+	expect(requests.map(request => [request.method, request.path])).toEqual([
+		["POST", "/session"], ["GET", "/session/test-session/source?format=json"], ["DELETE", "/session/test-session"],
+	]);
+});
+
+test("screenshot without an explicit session creates and deletes only its own session", async () => {
+	const { client, requests } = await strictCaptureWda();
+	await expect(client.getScreenshot()).resolves.toEqual(capturePng);
+	expect(requests.map(request => [request.method, request.path])).toEqual([
+		["POST", "/session"], ["GET", "/session/test-session/screenshot"], ["DELETE", "/session/test-session"],
+	]);
+});
+
+test("captureScreen reads size, elements and PNG in order with one owned session and one delete", async () => {
+	const { client, requests } = await strictCaptureWda();
+	const result = await client.captureScreen();
+	expect(result.size).toEqual({ width: 390, height: 844, scale: 3 });
+	expect(result.elements).toMatchObject([{ type: "Button", label: "Open", name: "Open", identifier: "test-button",
+		rect: { x: 10, y: 20, width: 100, height: 40 } }]);
+	expect(result.screenshot).toEqual(capturePng);
+	expect(requests.map(request => [request.method, request.path])).toEqual([
+		["POST", "/session"], ["GET", "/session/test-session/wda/screen"],
+		["GET", "/session/test-session/source?format=json"], ["GET", "/session/test-session/screenshot"],
+		["DELETE", "/session/test-session"],
+	]);
+});
+
+test("capture source failure does not take a screenshot or fall back and still cleans its session", async () => {
+	const { client, requests } = await strictCaptureWda("/session/test-session/source?format=json");
+	await expect(client.captureScreen()).rejects.toThrow(/HTTP 404.*capture step rejected/);
+	expect(requests.map(request => [request.method, request.path])).toEqual([
+		["POST", "/session"], ["GET", "/session/test-session/wda/screen"],
+		["GET", "/session/test-session/source?format=json"], ["DELETE", "/session/test-session"],
+	]);
+});
+
+test("captureScreen propagates cleanup failure after all three successful reads", async () => {
+	const { client, requests } = await strictCaptureWda(undefined, true);
+	await expect(client.captureScreen()).rejects.toThrow(/cleanup refused/);
+	expect(requests.filter(request => request.method === "POST" && request.path === "/session")).toHaveLength(1);
+	expect(requests.filter(request => request.method === "DELETE")).toHaveLength(1);
+	expect(requests.some(request => request.path === "/session/test-session/screenshot")).toBe(true);
+});
+
+test("captureScreen preserves its source failure when cleanup also fails", async () => {
+	const { client } = await strictCaptureWda("/session/test-session/source?format=json", true);
+	const failure = await client.captureScreen().catch(error => error);
+	expect(failure.message).toMatch(/HTTP 404.*capture step rejected/);
+	expect(failure.cleanupError.message).toContain("cleanup refused");
+});
+
+test("the strict route model rejects the real legacy source path and sessionless screenshots", async () => {
+	const { client, requests } = await strictCaptureWda();
+	for (const endpoint of ["/source/?format=json", "/source?format=json", "/screenshot",
+		"/session/test-session/source/?format=json", "/session/unowned-stale-session/source?format=json"]) {
+		await expect(client.requestJson(endpoint)).rejects.toThrow(/HTTP 404.*Unregistered WDA route/);
+	}
+	expect(requests).toHaveLength(5);
 });

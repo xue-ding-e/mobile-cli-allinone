@@ -153,6 +153,8 @@ node lib/cli.js shot ./ios-screen.png --platform ios --device YOUR_PAIRED_IPHONE
 
 `wda-status` 在认证设备后仅执行一次只读 `GET /status`，输出实际 endpoint、HTTP 状态、原始响应（最多 64KiB，含 `truncated` 标记）、解析结果或错误、耗时及网络错误原因。**HTTP 200 不等于就绪**：当前只接受无 HTTP / WebDriver 协议错误且 `value.ready === true` 的响应，其余结果 `ok: false` 并返回失败退出码。大响应不重复输出完整 parsed JSON，错误文本同样限长。该命令不会创建 WDA session 或执行点击；连接错误不代表应用渲染或整个平台功能已验收失败。
 
+批量读取 iOS 界面时，在 `run` / `eval` 中调用 `await robot.captureScreen()`，返回 `{size, elements, screenshot}`，其中截图为 `Buffer`，应通过脚本的文件接口保存。三项读取使用本次创建的同一个 WDA session，按官方路由访问 `source?format=json` 和 `screenshot`，完成或失败后清理本次 session；不会接管已有 session。单独的 `getScreenSize()`、`getElementsOnScreen()`、`getScreenshot()` 仍可分别使用。共享 session 只约束读取的会话身份，不表示三次操作发生在同一绘制帧。
+
 应用启动和安装示例：
 
 ```sh

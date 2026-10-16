@@ -56,8 +56,8 @@ const out = (v: unknown): void => {
 };
 
 const die = (msg: string): never => {
-	process.stderr.write("错误: " + msg + "\n");
-	process.exit(1);
+	// Propagate through owned session/finally scopes before ending the CLI.
+	throw new Error(msg);
 };
 
 // 轻量 argv:位置参数 + --k v / --k=v / --flag
@@ -161,6 +161,8 @@ const HELP = `mobile —— Android/鸿蒙/iOS CLI（复用 ADB/HDC/go-ios/Simct
   --wda-url <origin> 可核对配置中的同一 WDA 地址，不能静默改目标
   probe / wda-status / devices / screen-size / elements / shot / tap-text
   wda-status 单次只读 GET /status，保真实 HTTP/body/error/elapsed
+  iOS 批量读取：run/eval 中 await robot.captureScreen() 返回 {size,elements,screenshot:Buffer}
+  captureScreen 的三项读取共享自己创建的 WDA session，完成或失败均清理
   Wi-Fi bridge: launch <bundle> / install <ipa> --pkg <bundle>
   Wi-Fi bridge 暂不支持 apps/stop/uninstall；原 go-ios 后端保留
   iOS 真机用 --platform ios；模拟器用 --platform ios-simulator（macOS/Xcode）。
@@ -610,4 +612,8 @@ const flowCtx = (device: string, wvMgr: WebviewManager, platform: DevicePlatform
 	defaultDevice: device,
 });
 
-main().catch(e => die(e && e.message || String(e)));
+main().catch(e => {
+	process.stderr.write("错误: " + (e && e.message || String(e)) + "\n");
+	// An immediate process.exit can interrupt Windows HTTP handle cleanup.
+	process.exitCode = 1;
+});

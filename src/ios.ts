@@ -1,7 +1,7 @@
 import { Socket } from "node:net";
 import { execFileSync } from "node:child_process";
 
-import { WebDriverAgent, WebDriverStatusDiagnostic } from "./webdriver-agent";
+import { WebDriverAgent, WebDriverStatusDiagnostic, WebDriverScreenCapture } from "./webdriver-agent";
 import { ActionableError, Button, InstalledApp, Robot, ScreenSize, SwipeDirection, ScreenElement, Orientation } from "./robot";
 import { validatePackageName, validateLocale } from "./utils";
 
@@ -135,6 +135,12 @@ export class IosRobot implements Robot {
 	public async getScreenSize(): Promise<ScreenSize> {
 		const wda = await this.wda();
 		return await wda.getScreenSize();
+	}
+
+	/** Read size, elements and PNG under one session created by this call. */
+	public async captureScreen(): Promise<WebDriverScreenCapture> {
+		const wda = await this.wda();
+		return wda.captureScreen();
 	}
 
 	public async swipe(direction: SwipeDirection): Promise<void> {
