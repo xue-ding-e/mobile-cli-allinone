@@ -2,13 +2,13 @@
   "name": "@xue-ding-e/mobile-mcp-allinone",
   "mcpName": "io.github.xue-ding-e/mobile-mcp-allinone",
   "version": "0.0.1",
-  "description": "Mobile automation MCP and Android CLI with WebView CDP and JSON flow replay",
+  "description": "Multi-platform mobile CLI and MCP for Android, HarmonyOS and iOS, with Android WebView CDP and JSON flow replay",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xue-ding-e/mobile-mcp-allinone.git"
+    "url": "git+https://github.com/xue-ding-e/mobile-cli-allinone.git"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "license": "Apache-2.0",
   "scripts": {
@@ -18,7 +18,8 @@
     "test": "c8 playwright test",
     "watch": "tsc --watch",
     "clean": "rm -rf lib",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:offline": "npm run build && playwright test test/png.ts test/harmony.test.ts test/android-install.test.ts test/cli-ios.test.ts test/wda-errors.test.ts test/server-platform-routing.test.ts"
   },
   "files": [
     "lib"
@@ -57,14 +58,15 @@
   },
   "main": "index.js",
   "bin": {
-    "mcp-server-mobile": "lib/index.js"
+    "mcp-server-mobile": "lib/index.js",
+    "mobile-cli-allinone": "lib/cli.js"
   },
   "directories": {
     "lib": "lib"
   },
   "author": "xue-ding-e",
   "bugs": {
-    "url": "https://github.com/xue-ding-e/mobile-mcp-allinone/issues"
+    "url": "https://github.com/xue-ding-e/mobile-cli-allinone/issues"
   },
-  "homepage": "https://github.com/xue-ding-e/mobile-mcp-allinone#readme"
+  "homepage": "https://github.com/xue-ding-e/mobile-cli-allinone#readme"
 }
