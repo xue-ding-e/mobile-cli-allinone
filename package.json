@@ -19,10 +19,15 @@
     "watch": "tsc --watch",
     "clean": "rm -rf lib",
     "prepare": "husky",
-    "test:offline": "npm run build && playwright test test/png.ts test/harmony.test.ts test/android-install.test.ts test/cli-ios.test.ts test/wda-errors.test.ts test/server-platform-routing.test.ts"
+    "test:offline": "npm run build && playwright test test/png.ts test/harmony.test.ts test/android-install.test.ts test/cli-ios.test.ts test/wda-errors.test.ts test/server-platform-routing.test.ts test/ios-cli-local-offline.test.ts test/ios-cli-wda-integration-local.test.ts test/wda-local-offline.test.ts test/ios-identity-offline.test.ts test/ios-wifi-install-offline.test.ts"
   },
   "files": [
-    "lib"
+    "lib",
+    "scripts/ios-wifi-bridge/device.py",
+    "scripts/ios-wifi-bridge/identity_probe.py",
+    "scripts/ios-wifi-bridge/install_wifi.py",
+    "scripts/ios-wifi-bridge/requirements.txt",
+    "LICENSE"
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.26.0",

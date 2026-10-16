@@ -1,7 +1,7 @@
 import { Socket } from "node:net";
 import { execFileSync } from "node:child_process";
 
-import { WebDriverAgent } from "./webdriver-agent";
+import { WebDriverAgent, WebDriverStatusDiagnostic } from "./webdriver-agent";
 import { ActionableError, Button, InstalledApp, Robot, ScreenSize, SwipeDirection, ScreenElement, Orientation } from "./robot";
 import { validatePackageName, validateLocale } from "./utils";
 
@@ -40,9 +40,16 @@ const getGoIosPath = (): string => {
 	return "ios";
 };
 
+export interface IosRobotOptions {
+	wdaUrl?: string;
+	// An explicit wireless endpoint must be bound to an authenticated device.
+	verifyDevice?: () => Promise<void>;
+}
+
+
 export class IosRobot implements Robot {
 
-	public constructor(private deviceId: string) {
+	public constructor(private deviceId: string, private options: IosRobotOptions = {}) {
 	}
 
 	private isListeningOnPort(port: number): Promise<boolean> {
@@ -75,7 +82,24 @@ export class IosRobot implements Robot {
 		}
 	}
 
+	private async configuredWdaClient(): Promise<WebDriverAgent> {
+		if (!this.options.wdaUrl || !this.options.verifyDevice) {throw new ActionableError("Explicit WDA endpoint requires an authenticated device binding");}
+		await this.options.verifyDevice();
+		const endpoint = new URL(this.options.wdaUrl);
+		return new WebDriverAgent(endpoint.hostname.replace(/^\[|\]$/g, ""), Number(endpoint.port || (endpoint.protocol === "https:" ? 443 : 80)), { protocol: endpoint.protocol as "http:" | "https:" });
+	}
+
+	public async getWdaStatusDiagnostic(): Promise<WebDriverStatusDiagnostic> {
+		const wda = await this.configuredWdaClient();
+		return wda.getStatusDiagnostic();
+	}
+
 	private async wda(): Promise<WebDriverAgent> {
+		if (this.options.wdaUrl) {
+			const wda = await this.configuredWdaClient();
+			await wda.assertReady();
+			return wda;
+		}
 
 		await this.assertTunnelRunning();
 

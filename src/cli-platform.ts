@@ -4,14 +4,22 @@ import { AndroidRobot } from "./android";
 import { HarmonyRobot } from "./harmony";
 import { IosManager, IosRobot } from "./ios";
 import { Simctl } from "./iphone-simulator";
+import { IosWifiRobot } from "./ios-wifi-bridge";
 
 export type DevicePlatform = "android" | "harmony" | "ios" | "ios-simulator";
 export const platforms: DevicePlatform[] = ["android", "harmony", "ios", "ios-simulator"];
-export const makeRobot = (device: string, platform: DevicePlatform) => {
+export const makeRobot = (device: string, platform: DevicePlatform, opts: Record<string, string | boolean> = {}) => {
 	switch (platform) {
 		case "android": return new AndroidRobot(device);
 		case "harmony": return new HarmonyRobot(device);
-		case "ios": return new IosRobot(device);
+		case "ios": {
+			if (opts["ios-config"] !== undefined || opts["wda-url"] !== undefined) {
+				if (typeof opts["ios-config"] !== "string" || !opts["ios-config"].trim()) {throw new Error("--ios-config requires a non-empty value");}
+				if (opts["wda-url"] !== undefined && (typeof opts["wda-url"] !== "string" || !opts["wda-url"].trim())) {throw new Error("--wda-url requires a non-empty value");}
+				return new IosWifiRobot(device, opts["ios-config"], typeof opts.pkg === "string" ? opts.pkg : undefined, typeof opts["wda-url"] === "string" ? opts["wda-url"] : undefined);
+			}
+			return new IosRobot(device);
+		}
 		case "ios-simulator": return new Simctl(device);
 	}
 };

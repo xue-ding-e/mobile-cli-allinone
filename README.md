@@ -18,7 +18,7 @@
 - Android 专属：`wv-*`、脚本 `wv`、WebView 流程和 CLI 录屏。没有 iOS Safari / WKWebView 或 HarmonyOS WebView CDP 接入。
 - HarmonyOS 支持控件读取、点击/双击/长按/滑动、文字输入、截图、应用启动/停止、签名 HAP 安装/卸载、文件传输与电源操作。长按时长由 UITest 决定，不支持自定义 duration；`url`、设置方向、录屏尚不支持。读取方向根据截图尺寸判断。
 - HDC `install` 仅接受 `.hap`，不会把 APK 当 HAP 安装。卓易通等兼容环境里的 APK 导入和手机端安装需要单独处理。
-- iOS 真机 WDA 使用本机 `localhost:8100`，iOS 17+ tunnel 检查使用 `60105`。操作前必须确认该端口对应选定设备；固定端口也适用于 CLI 模拟器 WDA，不提供多台 iOS 设备/模拟器并发隔离保证。
+- 默认 iOS 真机 go-ios 路径的 WDA 使用本机 `localhost:8100`，iOS 17+ tunnel 检查使用 `60105`。操作前必须确认该端口对应选定设备；固定端口也适用于 CLI 模拟器 WDA，不提供多台 iOS 设备/模拟器并发隔离保证。
 - MCP 的设备发现隔离不同驱动的失败；Android / HarmonyOS / iOS 真机的原生操作不要求先安装模拟器用的 mobilecli。MCP 录屏和崩溃报告仍使用 mobilecli，HarmonyOS 不支持这些工具。
 - CLI iOS 不支持 `connect`、`wake`、`power-state`、`keep-awake`、文件传输和录屏。WDA 按键仅支持 `HOME`、`VOLUME_UP`、`VOLUME_DOWN`、`ENTER`，不能照搬 Android 的 `BACK`。CLI 与 MCP 的模拟器驱动分别为 Simctl / WDA 与 mobilecli / agent。
 
@@ -111,6 +111,56 @@ node lib/cli.js eval "return await robot.getScreenSize()"
 ```
 
 `--all` 可显示未启动的模拟器，不代表它可以立即执行操作。CLI 不会自动创建/启动模拟器，也不会创建 iOS 无线连接或部署 WDA。模拟器安装使用适配模拟器的 `.app`，也支持顶层包含 `.app` 的 `.zip`；不能将真机 IPA 当作模拟器应用通用安装。
+
+### 可选 iOS Wi-Fi CLI 配置
+
+`--ios-config` 选择已经完成信任配对的 Wi-Fi 入口；不传该参数时仍保留原 go-ios / WDA 路径。该配置只用于 CLI，不改变 MCP 和 Simulator 的驱动。工具不会自动配对、生成配对记录、启动 WDA、构建或签名应用。
+
+准备 **Python 3.11 或更新版本**，在所选 Python 环境安装可选依赖：
+
+```sh
+python -m pip install -r scripts/ios-wifi-bridge/requirements.txt
+```
+
+该入口固定依赖 [pymobiledevice3 11.32.0](https://pypi.org/project/pymobiledevice3/11.32.0/)，其许可证为 **GPL-3.0-or-later**；它是使用者单独安装的可选运行依赖，不属于本仓库 Apache-2.0 许可证覆盖的第三方代码。所附 Python 文件是调用该依赖的自研适配，不包含该依赖源码或设备配对数据。默认 go-ios 路径不要求安装此 Python 依赖。
+
+在仓库外创建私有 JSON，例如 `private-ios.json`；下列全部为占位符，必须替换成自己的已配对设备和已运行 WDA 的地址：
+
+```json
+{
+  "device": {
+    "udid": "YOUR_PAIRED_IPHONE_UDID",
+    "wdaUrl": "http://YOUR_WDA_HOST:8100",
+    "lastWifiHost": "YOUR_PAIRED_IPHONE_HOST"
+  },
+  "pythonRelative": "./YOUR_PYTHON_RUNTIME/python.exe"
+}
+```
+
+`pythonRelative` 相对于该 JSON 所在目录解析；macOS/Linux 可使用自己的 Python 可执行文件路径。配对记录由使用者预先保存在所选运行用户的 `~/.pymobiledevice3/`，不得提交 JSON、配对记录或 Python 环境。命令优先复用 JSON 同目录完整的 `identity_probe.py` / `device.py` / `install_wifi.py` 脚本组；缺少任一文件时统一使用仓库随附的 `scripts/ios-wifi-bridge/`，不混用两组脚本。脚本执行仍检查真实设备 UDID，不会退回 USB 或另一台手机。UI 前身份检查仅读取配对 TCP lockdown，不创建开发者隧道、RSD 或 XCTest 服务；应用启动和安装仍通过相应受控开发接口完成。
+
+每条设备命令都显式传相同的 `--device` 和 `--ios-config`：
+
+```sh
+node lib/cli.js devices --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+node lib/cli.js probe --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+node lib/cli.js wda-status --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+node lib/cli.js elements --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+node lib/cli.js shot ./ios-screen.png --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+```
+
+可再传 `--wda-url http://YOUR_WDA_HOST:8100` 核对目标；它必须与私有 JSON 中配置的 HTTP(S) origin 完全相同，不接受另一个地址，也不接受凭据、路径、query 或 fragment。Wi-Fi 设备身份验证成功只证明认证传输可用，UI 操作还要求 WDA 就绪。
+
+`wda-status` 在认证设备后仅执行一次只读 `GET /status`，输出实际 endpoint、HTTP 状态、原始响应（最多 64KiB，含 `truncated` 标记）、解析结果或错误、耗时及网络错误原因。**HTTP 200 不等于就绪**：当前只接受无 HTTP / WebDriver 协议错误且 `value.ready === true` 的响应，其余结果 `ok: false` 并返回失败退出码。大响应不重复输出完整 parsed JSON，错误文本同样限长。该命令不会创建 WDA session 或执行点击；连接错误不代表应用渲染或整个平台功能已验收失败。
+
+应用启动和安装示例：
+
+```sh
+node lib/cli.js launch com.example.app --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+node lib/cli.js install /PRIVATE_PATH/App.ipa --pkg com.example.app --platform ios --device YOUR_PAIRED_IPHONE_UDID --ios-config /PRIVATE_PATH/private-ios.json
+```
+
+`launch` 使用显式 bundle ID，`install` 必须另传 `--pkg`。安装前读取 IPA 中唯一主 App 的 `Info.plist`，核对 bundle 与版本；安装后通过真实设备 lookup 再核对相同身份和版本，不能把设备上已有的另一应用或旧版本当作本次安装成功。Wi-Fi profile 的 `apps`、`stop`、`uninstall` 明确不支持；应用编译、签名和 WDA 部署由外部工具完成。本节描述接口和前置条件，不表示任何原始应用页面、设备型号或 GUI 交互已经通过验收。
 
 ### 一次脚本完成多个步骤
 
@@ -217,7 +267,7 @@ npx tsc --noEmit
 npm run test:offline
 ```
 
-`test:offline` 先构建，再仅运行 PNG、Harmony、ADB 安装结果、CLI iOS 路由、WDA 错误处理和 MCP 平台路由这六个解析/模拟执行器测试文件，不自动发现或操作设备。**不要在不了解测试内容时直接运行 `npm test`**：默认套件包含 Android / iOS / 模拟器测试，可能读取或改变已连接设备，部分测试在收集阶段就调用平台工具。
+`test:offline` 先构建，再仅运行十一个指定文件：PNG、Harmony、ADB 安装结果、原 CLI iOS 路由、WDA 错误处理、MCP 平台路由，以及 Wi-Fi CLI 身份约束、WDA 诊断、本地子进程集成、纯 lockdown 身份与 IPA 安装身份测试。它们不发现或操作真实设备；HTTP 仅连接 loopback。子进程集成测试使用本机 Python 运行合成脚本，没有 Python 时明确跳过该项。**不要在不了解测试内容时直接运行 `npm test`**：默认套件包含 Android / iOS / 模拟器测试，可能读取或改变已连接设备，部分测试在收集阶段就调用平台工具。
 
 问题反馈：[Issues](https://github.com/xue-ding-e/mobile-cli-allinone/issues)。请附提交版本、主机系统、目标平台及脱敏复现信息，区分“源码已实现”“模拟测试通过”和“真机已验证”。
 

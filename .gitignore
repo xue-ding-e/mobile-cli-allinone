@@ -21,3 +21,5 @@ playwright-report
 *.pfx
 *.log
 *.tsbuildinfo
+__pycache__/
+*.py[cod]

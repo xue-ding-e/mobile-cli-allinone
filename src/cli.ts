@@ -11,6 +11,7 @@ import { execFileSync } from "node:child_process";
 import { AndroidRobot, AndroidDeviceManager, getAdbPath } from "./android";
 import { HarmonyRobot, HarmonyDeviceManager } from "./harmony";
 import { DevicePlatform, platforms, makeRobot, capabilities, listIosDevices } from "./cli-platform";
+import { IosWifiRobot } from "./ios-wifi-bridge";
 import { WebviewManager } from "./webview";
 import { runFlow, saveFlow, loadFlow, listFlows, FlowStep, FlowContext } from "./flows";
 
@@ -95,6 +96,7 @@ const resolveDevice = (opts: Record<string, string | boolean>): string => {
 		return opts.device;
 	}
 	const st = loadState(), platform = resolvePlatform(opts);
+	if (opts["ios-config"] !== undefined) {return die("iOS Wi-Fi requires explicit --device <UDID>; no global default is selected");}
 	if (st.device && (st.platform || "android") === platform) {return st.device;}
 	if (platform === "harmony") {
 		const devices = new HarmonyDeviceManager().listTargets().filter(d => d.status === "Connected");
@@ -154,8 +156,15 @@ const HELP = `mobile —— Android/鸿蒙/iOS CLI（复用 ADB/HDC/go-ios/Simct
 设备/状态:
   devices [--all]            列 ADB/HDC/iOS 设备，--all 含离线状态
   capabilities [--platform 平台]  静态能力与依赖（不代表设备已就绪）
+  iOS Wi-Fi: --platform ios --device <UDID> --ios-config <private.json>
+  配置绑定现有无线配对/认证桥与 WDA；不启动代理、不配对、不构建签名
+  --wda-url <origin> 可核对配置中的同一 WDA 地址，不能静默改目标
+  probe / wda-status / devices / screen-size / elements / shot / tap-text
+  wda-status 单次只读 GET /status，保真实 HTTP/body/error/elapsed
+  Wi-Fi bridge: launch <bundle> / install <ipa> --pkg <bundle>
+  Wi-Fi bridge 暂不支持 apps/stop/uninstall；原 go-ios 后端保留
   iOS 真机用 --platform ios；模拟器用 --platform ios-simulator（macOS/Xcode）。
-  iOS UI 操作需 WDA localhost:8100；iOS 17+ 真机还需 tunnel localhost:60105。
+  默认 go-ios 的 UI 操作需 WDA localhost:8100；iOS 17+ 真机还需 tunnel localhost:60105。
   iOS 不支持 wv-*、录屏、connect、wake/power-state、HDC 文件传输。
   connect <地址> --platform harmony|android
   use <设备> --platform harmony  持久选择 HDC；USB 和无线地址分开
@@ -199,13 +208,37 @@ const main = async (): Promise<void> => {
 		return;
 	}
 
+	if (opts["ios-config"] !== undefined || opts["wda-url"] !== undefined) {
+		if (opts.platform !== "ios") {return die("iOS Wi-Fi options require explicit --platform ios");}
+		for (const name of ["ios-config", "wda-url"]) {
+			if (opts[name] !== undefined && (typeof opts[name] !== "string" || !String(opts[name]).trim())) {return die(`--${name} requires a non-empty value`);}
+		}
+		if (!opts["ios-config"]) {return die("--wda-url requires --ios-config to bind the endpoint to the selected device");}
+		if (typeof opts.device !== "string" || !opts.device.trim()) {return die("iOS Wi-Fi requires explicit --device <UDID>");}
+		if (cmd === "use") {return die("iOS Wi-Fi uses explicit --device; global default is not changed");}
+	}
 	const selectedPlatform = cmd === "devices" ? "android" : resolvePlatform(opts);
 	if (selectedPlatform.startsWith("ios") && ["connect", "wake", "keep-awake", "power-state", "file-send", "file-recv", "record"].includes(cmd)) {
 		die(`${selectedPlatform} 不支持 ${cmd}；用 capabilities 查看能力`);
 	}
 	switch (cmd) {
-		case "capabilities": {out(capabilities(selectedPlatform)); return;}
+		case "capabilities": {
+			out({ ...capabilities(selectedPlatform), ...(opts["ios-config"] ? { backend: "pymobiledevice3-existing-wifi-bridge+WDA", requirements: ["Python >=3.11 with optional Wi-Fi bridge requirements", "existing paired Wi-Fi device", "explicit --device + --ios-config bound WDA origin"], unsupported: ["apps", "stop", "uninstall", "WebView/CDP", "build/sign"], coordinateUnit: "WDA points; PNG dimensions are physical pixels" } : {}) }); return;
+		}
+		case "probe":
+		case "wda-status": {
+			const robot = makeRobot(resolveDevice(opts), resolvePlatform(opts), opts);
+			if (!(robot instanceof IosWifiRobot)) {return die(`${cmd} requires --platform ios --ios-config`);}
+			if (cmd === "probe") {out(await robot.probe()); return;}
+			const diagnostic = await robot.getWdaStatusDiagnostic(); out(diagnostic);
+			if (!diagnostic.ok) {process.exitCode = 1;}
+			return;
+		}
 		case "devices": {
+			if (opts.platform === "ios" && opts["ios-config"]) {
+				const robot = makeRobot(resolveDevice(opts), "ios", opts) as IosWifiRobot;
+				out([await robot.probe()]); return;
+			}
 			const platform = opts.platform || "all", includeOffline = Boolean(opts.all || opts["include-offline"]);
 			if (![...platforms, "all"].includes(String(platform))) {die("devices --platform android|harmony|ios|ios-simulator|all");}
 			const list: unknown[] = [];
@@ -274,7 +307,7 @@ const main = async (): Promise<void> => {
 			: (pos[0] || die("用法: mobile eval \"<js>\""));
 		const device = resolveDevice(opts);
 		const platform = resolvePlatform(opts);
-		const robot = makeRobot(device, platform);
+		const robot = makeRobot(device, platform, opts);
 		const wvMgr = new WebviewManager();
 		const st = loadState();
 		// wv:惰性连接的 Android webview 便捷面(首次用到才 connect,脚本结束统一断开)
@@ -297,7 +330,7 @@ const main = async (): Promise<void> => {
 			net: async (ms = 3000) => (await ensureWv()).networkCapture(device, ms),
 		};
 		const flows = {
-			run: async (name: string, stopOnError = true) => runFlow(loadFlow(name), flowCtx(device, wvMgr, resolvePlatform(opts)), stopOnError),
+			run: async (name: string, stopOnError = true) => runFlow(loadFlow(name), flowCtx(device, wvMgr, resolvePlatform(opts), opts), stopOnError),
 			list: () => listFlows(),
 		};
 		const adb = (...args: string[]): string => {
@@ -329,7 +362,7 @@ const main = async (): Promise<void> => {
 	}
 
 	// ===== 原生 adb 薄命令(无状态) =====
-	const robotOf = () => makeRobot(resolveDevice(opts), resolvePlatform(opts));
+	const robotOf = () => makeRobot(resolveDevice(opts), resolvePlatform(opts), opts);
 	switch (cmd) {
 		case "apps": {
 			const apps = await robotOf().listApps();
@@ -548,7 +581,7 @@ const main = async (): Promise<void> => {
 			? JSON.parse(fs.readFileSync(nameOrFile, "utf8"))
 			: loadFlow(nameOrFile);
 		try {
-			const result = await runFlow(steps, flowCtx(device, wvMgr, resolvePlatform(opts)), !opts["keep-going"]);
+			const result = await runFlow(steps, flowCtx(device, wvMgr, resolvePlatform(opts), opts), !opts["keep-going"]);
 			out(result);
 			if (!result.passed) {process.exitCode = 1;}
 		} finally {
@@ -570,8 +603,8 @@ const main = async (): Promise<void> => {
 	die(`未知命令: ${cmd}(mobile help 看全部)`);
 };
 
-const flowCtx = (device: string, wvMgr: WebviewManager, platform: DevicePlatform): FlowContext => ({
-	getRobot: (d: string) => makeRobot(d, platform),
+const flowCtx = (device: string, wvMgr: WebviewManager, platform: DevicePlatform, opts: Record<string, string | boolean>): FlowContext => ({
+	getRobot: (d: string) => makeRobot(d, platform, opts),
 	platform,
 	webview: wvMgr,
 	defaultDevice: device,
