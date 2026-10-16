@@ -62,9 +62,9 @@ export class Mobilecli {
 		return this.path;
 	}
 
-	public executeCommand(args: string[]): string {
+	public executeCommand(args: string[], timeout?: number): string {
 		const path = this.getPath();
-		return execFileSync(path, args, { encoding: "utf8" }).toString().trim();
+		return execFileSync(path, args, { encoding: "utf8", timeout, ...(timeout ? { killSignal: "SIGKILL" as const } : {}) }).toString().trim();
 	}
 
 	public spawnCommand(args: string[]): ChildProcess {
@@ -168,7 +168,7 @@ export class Mobilecli {
 		this.executeCommand(["agent", "install", "--device", deviceId]);
 	}
 
-	getDevices(options?: MobilecliDevicesOptions): MobilecliDevicesResponse {
+	getDevices(options?: MobilecliDevicesOptions, timeout?: number): MobilecliDevicesResponse {
 		const args = ["devices"];
 
 		if (options) {
@@ -193,7 +193,7 @@ export class Mobilecli {
 			}
 		}
 
-		const mobilecliOutput = this.executeCommand(args);
+		const mobilecliOutput = this.executeCommand(args, timeout);
 		return JSON.parse(mobilecliOutput) as MobilecliDevicesResponse;
 	}
 }

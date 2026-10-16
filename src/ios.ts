@@ -244,9 +244,15 @@ export class IosRobot implements Robot {
 
 export class IosManager {
 
+	public constructor(private discoveryTimeout?: number) {}
+
+	private discoveryOptions() {
+		return { timeout: this.discoveryTimeout, ...(this.discoveryTimeout ? { killSignal: "SIGKILL" as const } : {}) };
+	}
+
 	public isGoIosInstalled(): boolean {
 		try {
-			const output = execFileSync(getGoIosPath(), ["version"], { stdio: ["pipe", "pipe", "ignore"] }).toString();
+			const output = execFileSync(getGoIosPath(), ["version"], { ...this.discoveryOptions(), stdio: ["pipe", "pipe", "ignore"] }).toString();
 			const json: VersionCommandOutput = JSON.parse(output);
 			return json.version !== undefined && (json.version.startsWith("v") || json.version === "local-build");
 		} catch (error) {
@@ -255,13 +261,13 @@ export class IosManager {
 	}
 
 	public getDeviceName(deviceId: string): string {
-		const output = execFileSync(getGoIosPath(), ["info", "--udid", deviceId]).toString();
+		const output = execFileSync(getGoIosPath(), ["info", "--udid", deviceId], this.discoveryOptions()).toString();
 		const json: InfoCommandOutput = JSON.parse(output);
 		return json.DeviceName;
 	}
 
 	public getDeviceInfo(deviceId: string): InfoCommandOutput {
-		const output = execFileSync(getGoIosPath(), ["info", "--udid", deviceId]).toString();
+		const output = execFileSync(getGoIosPath(), ["info", "--udid", deviceId], this.discoveryOptions()).toString();
 		const json: InfoCommandOutput = JSON.parse(output);
 		return json;
 	}
@@ -272,7 +278,7 @@ export class IosManager {
 			return [];
 		}
 
-		const output = execFileSync(getGoIosPath(), ["list"]).toString();
+		const output = execFileSync(getGoIosPath(), ["list"], this.discoveryOptions()).toString();
 		const json: ListCommandOutput = JSON.parse(output);
 		const devices = json.deviceList.map(device => ({
 			deviceId: device,
@@ -288,7 +294,7 @@ export class IosManager {
 			return [];
 		}
 
-		const output = execFileSync(getGoIosPath(), ["list"]).toString();
+		const output = execFileSync(getGoIosPath(), ["list"], this.discoveryOptions()).toString();
 		const json: ListCommandOutput = JSON.parse(output);
 		const devices = json.deviceList.map(device => {
 			const info = this.getDeviceInfo(device);

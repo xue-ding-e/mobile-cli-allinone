@@ -5,6 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { runFlow } from "../src/flows";
 import { WebviewManager } from "../src/webview";
+import { IosManager } from "../src/ios";
+import { listIosDevices } from "../src/cli-platform";
 
 const cli = path.resolve(__dirname, "../lib/cli.js");
 let home: string;
@@ -85,4 +87,21 @@ test("flow checks the platform of each overridden device", async () => {
 	const result = await runFlow([{ op: "assert_eval" }, { op: "assert_eval", device: "ios-phone" }], context);
 	expect(inspected).toEqual(["android-phone", "ios-phone"]);
 	expect(result.results.map(r => r.ok)).toEqual([true, false]);
+});
+
+
+test("CLI iOS discovery uses a bounded ten-second process timeout", () => {
+	const installed = IosManager.prototype.isGoIosInstalled;
+	const details = IosManager.prototype.listDevicesWithDetails;
+	try {
+		IosManager.prototype.isGoIosInstalled = () => true;
+		IosManager.prototype.listDevicesWithDetails = function() {
+			expect((this as unknown as { discoveryTimeout: number }).discoveryTimeout).toBe(10000);
+			return [];
+		};
+		expect(listIosDevices("ios")).toEqual([]);
+	} finally {
+		IosManager.prototype.isGoIosInstalled = installed;
+		IosManager.prototype.listDevicesWithDetails = details;
+	}
 });

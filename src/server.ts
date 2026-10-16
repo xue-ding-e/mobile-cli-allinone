@@ -8,6 +8,7 @@ import { ChildProcess } from "node:child_process";
 
 import { error, trace } from "./logger";
 import { AndroidRobot, AndroidDeviceManager } from "./android";
+import { HarmonyDeviceManager, HarmonyRobot } from "./harmony";
 import { ActionableError, Robot } from "./robot";
 import { IosManager, IosRobot } from "./ios";
 import { PNG } from "./png";
@@ -24,7 +25,9 @@ const ALLOWED_RECORDING_EXTENSIONS = [".mp4"];
 interface MobilecliDevice {
 	id: string;
 	name: string;
-	platform: "android" | "ios";
+	platform: "android" | "ios" | "harmony";
+	transport?: string;
+	status?: string;
 	type: "real" | "emulator" | "simulator";
 	version: string;
 	state: "online" | "offline";
@@ -80,6 +83,11 @@ export const createMcpServer = (): McpServer => {
 			try {
 				trace(`Invoking ${name} with args: ${JSON.stringify(args)}`);
 				const start = +new Date();
+				if (name.startsWith("webview_")) {
+					if (getPlatform(args.device) !== "android") {
+						throw new ActionableError("WebView/CDP tools currently support Android only");
+					}
+				}
 				const response = await cb(args);
 				const duration = +new Date() - start;
 				trace(`=> ${response}`);
@@ -92,6 +100,7 @@ export const createMcpServer = (): McpServer => {
 				if (error instanceof ActionableError) {
 					return {
 						content: [{ type: "text", text: `${error.message}. Please fix the issue and try again.` }],
+						isError: true,
 					};
 				} else {
 					// a real exception
@@ -165,122 +174,87 @@ export const createMcpServer = (): McpServer => {
 		}
 	};
 
+	// Discovery backends are optional and isolated: an HDC-only or ADB-only
+	// installation must not depend on Apple's mobilecli/go-ios tools.
+	const optionalDevices = <T>(backend: string, read: () => T[]): T[] => {
+		try { return read(); } catch (err: any) {
+			trace(`${backend} discovery unavailable: ${err.message}`);
+			return [];
+		}
+	};
+
+	const discoverDevices = (details = false): MobilecliDevice[] => {
+		const android = new AndroidDeviceManager(3000);
+		const ios = new IosManager(3000);
+		const devices: MobilecliDevice[] = [];
+		for (const device of optionalDevices("adb", () => details ? android.getConnectedDevicesWithDetails() : android.getConnectedDevices())) {
+			devices.push({ id: device.deviceId, name: "name" in device ? String(device.name) : device.deviceId,
+				platform: "android", type: device.deviceId.startsWith("emulator-") ? "emulator" : "real",
+				version: "version" in device ? String(device.version) : "unknown", state: "online" });
+		}
+		for (const device of optionalDevices("go-ios", () => details ? ios.listDevicesWithDetails() : ios.listDevices())) {
+			devices.push({ id: device.deviceId, name: device.deviceName, platform: "ios", type: "real",
+				version: "version" in device ? String(device.version) : "unknown", state: "online" });
+		}
+		for (const device of optionalDevices("hdc", () => new HarmonyDeviceManager().listTargets())) {
+			devices.push({ id: device.id, name: device.id, platform: "harmony", type: "real", version: "unknown",
+				state: device.status === "Connected" ? "online" : "offline", status: device.status, transport: device.transport });
+		}
+		devices.push(...optionalDevices("mobilecli", () => {
+			const response = mobilecli.getDevices({ platform: "ios", type: "simulator", includeOffline: false }, 3000);
+			return response.status === "ok" ? (response.data?.devices || []).filter(d => d.platform === "ios" && d.type === "simulator").map(d => ({ ...d, state: "online" as const })) : [];
+		}));
+		return devices;
+	};
+
+	const resolveDevice = (deviceId: string): MobilecliDevice => {
+		const matches = discoverDevices().filter(d => d.id === deviceId);
+		if (matches.length > 1) {
+			throw new ActionableError(`Device "${deviceId}" is ambiguous across backends; disconnect the duplicate device before retrying`);
+		}
+		const device = matches[0];
+		if (!device) {
+			throw new ActionableError(`Device "${deviceId}" not found. Use the mobile_list_available_devices tool to see available devices and check the platform's ADB, HDC, go-ios or mobilecli dependency`);
+		}
+		if (device.state !== "online") {
+			throw new ActionableError(`Device "${deviceId}" is not ready: ${device.status || device.state}`);
+		}
+		return device;
+	};
+	const getPlatform = (deviceId: string): MobilecliDevice["platform"] => resolveDevice(deviceId).platform;
+
 	const getRobotFromDevice = (deviceId: string): Robot => {
-
-		// from now on, we must have mobilecli working
+		const device = resolveDevice(deviceId);
+		posthog("get_robot", { "DevicePlatform": device.platform, "DeviceType": device.type }).then();
+		if (device.platform === "android") {return new AndroidRobot(deviceId);}
+		if (device.platform === "harmony") {return new HarmonyRobot(deviceId);}
+		if (device.type === "real") {return new IosRobot(deviceId);}
 		ensureMobilecliAvailable();
-
-		// Check if it's an iOS device
-		const iosManager = new IosManager();
-		const iosDevices = iosManager.listDevices();
-		const iosDevice = iosDevices.find(d => d.deviceId === deviceId);
-		if (iosDevice) {
-			posthog("get_robot", { "DevicePlatform": "ios", "DeviceType": "real" }).then();
-			return new IosRobot(deviceId);
-		}
-
-		// Check if it's an Android device
-		const androidManager = new AndroidDeviceManager();
-		const androidDevices = androidManager.getConnectedDevices();
-		const androidDevice = androidDevices.find(d => d.deviceId === deviceId);
-		if (androidDevice) {
-			posthog("get_robot", { "DevicePlatform": "android" }).then();
-			return new AndroidRobot(deviceId);
-		}
-
-		// Check if it's a simulator (will later replace all other device types as well)
-		const response = mobilecli.getDevices({
-			platform: "ios",
-			type: "simulator",
-			includeOffline: false,
-		});
-
-		if (response.status === "ok" && response.data && response.data.devices) {
-			for (const device of response.data.devices) {
-				if (device.id === deviceId) {
-					if (!agentVerifiedSimulators.has(deviceId)) {
-						const agentStatus = mobilecli.agentStatus(deviceId);
-						if (agentStatus.status === "fail") {
-							mobilecli.agentInstall(deviceId);
-						}
-
-						agentVerifiedSimulators.add(deviceId);
-					}
-
-					posthog("get_robot", { "DevicePlatform": "ios", "DeviceType": "simulator" }).then();
-					return new MobileDevice(deviceId);
-				}
+		if (!agentVerifiedSimulators.has(deviceId)) {
+			const agentStatus = mobilecli.agentStatus(deviceId);
+			if (agentStatus.status === "fail") {
+				mobilecli.agentInstall(deviceId);
 			}
+			agentVerifiedSimulators.add(deviceId);
 		}
+		return new MobileDevice(deviceId);
+	};
 
-		throw new ActionableError(`Device "${deviceId}" not found. Use the mobile_list_available_devices tool to see available devices.`);
+	const requireMobilecliDevice = (deviceId: string): void => {
+		if (getPlatform(deviceId) === "harmony") {
+			throw new ActionableError("Recording and crash-report tools do not support Harmony devices");
+		}
+		ensureMobilecliAvailable();
 	};
 
 	tool(
 		"mobile_list_available_devices",
 		"List Devices",
-		"List all available devices. This includes both physical mobile devices and mobile simulators and emulators. It returns both Android and iOS devices.",
+		"List Android, iOS and Harmony devices using available platform backends. Harmony status and transport are included; only Connected targets are online.",
 		{},
 		{ readOnlyHint: true },
 		async ({}) => {
-
-			// from today onward, we must have mobilecli working
-			ensureMobilecliAvailable();
-
-			const iosManager = new IosManager();
-			const androidManager = new AndroidDeviceManager();
-			const devices: MobilecliDevice[] = [];
-
-			// Get Android devices with details
-			const androidDevices = androidManager.getConnectedDevicesWithDetails();
-			for (const device of androidDevices) {
-				devices.push({
-					id: device.deviceId,
-					name: device.name,
-					platform: "android",
-					type: "emulator",
-					version: device.version,
-					state: "online",
-				});
-			}
-
-			// Get iOS physical devices with details
-			try {
-				const iosDevices = iosManager.listDevicesWithDetails();
-				for (const device of iosDevices) {
-					devices.push({
-						id: device.deviceId,
-						name: device.deviceName,
-						platform: "ios",
-						type: "real",
-						version: device.version,
-						state: "online",
-					});
-				}
-			} catch (error: any) {
-				// If go-ios is not available, silently skip
-			}
-
-			// Get iOS simulators from mobilecli (excluding offline devices)
-			const response = mobilecli.getDevices({
-				platform: "ios",
-				type: "simulator",
-				includeOffline: false,
-			});
-			if (response.status === "ok" && response.data && response.data.devices) {
-				for (const device of response.data.devices) {
-					devices.push({
-						id: device.id,
-						name: device.name,
-						platform: device.platform,
-						type: device.type,
-						version: device.version,
-						state: "online",
-					});
-				}
-			}
-
-			const out: MobilecliDevicesResponse = { devices };
+			const out: MobilecliDevicesResponse = { devices: discoverDevices(true) };
 			return JSON.stringify(out);
 		}
 	);
@@ -736,7 +710,7 @@ export const createMcpServer = (): McpServer => {
 				validateOutputPath(output);
 			}
 
-			getRobotFromDevice(device);
+			requireMobilecliDevice(device);
 
 			if (activeRecordings.has(device)) {
 				throw new ActionableError(`Device "${device}" is already being recorded. Stop the current recording first with mobile_stop_screen_recording.`);
@@ -821,7 +795,7 @@ export const createMcpServer = (): McpServer => {
 		},
 		{ readOnlyHint: true },
 		async ({ device }) => {
-			ensureMobilecliAvailable();
+			requireMobilecliDevice(device);
 			const response = mobilecli.crashesList(device);
 			return JSON.stringify(response.data);
 		}
@@ -837,7 +811,7 @@ export const createMcpServer = (): McpServer => {
 		},
 		{ readOnlyHint: true },
 		async ({ device, id }) => {
-			ensureMobilecliAvailable();
+			requireMobilecliDevice(device);
 			const response = mobilecli.crashesGet(device, id);
 			return response.data.content;
 		}
@@ -1002,7 +976,7 @@ export const createMcpServer = (): McpServer => {
 			if (saveAs) {
 				saveFlow(saveAs, flowSteps);
 			}
-			const r = await runFlow(flowSteps, { getRobot: getRobotFromDevice, webview, defaultDevice: device }, stopOnError !== false);
+			const r = await runFlow(flowSteps, { getRobot: getRobotFromDevice, getPlatform, webview, defaultDevice: device }, stopOnError !== false);
 			return JSON.stringify(r);
 		}
 	);

@@ -36,7 +36,7 @@ export const capabilities = (platform: DevicePlatform) => ({
 
 export const listIosDevices = (platform: "ios" | "ios-simulator", includeOffline = false) => {
 	if (platform === "ios") {
-		const manager = new IosManager();
+		const manager = new IosManager(10000);
 		if (!manager.isGoIosInstalled()) {throw new Error("go-ios 不可用，请安装 go-ios 或设置 GO_IOS_PATH；UI 操作还需 WebDriverAgent");}
 		return manager.listDevicesWithDetails().map(d => ({ id: d.deviceId, name: d.deviceName, version: d.version, platform, status: "device" }));
 	}

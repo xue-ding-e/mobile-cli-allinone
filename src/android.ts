@@ -530,6 +530,8 @@ export class AndroidRobot implements Robot {
 
 export class AndroidDeviceManager {
 
+	public constructor(private discoveryTimeout?: number) {}
+
 	private getDeviceType(name: string): AndroidDeviceType {
 		try {
 			const device = new AndroidRobot(name);
@@ -579,7 +581,7 @@ export class AndroidDeviceManager {
 
 	public getConnectedDevices(): AndroidDevice[] {
 		try {
-			const names = execFileSync(getAdbPath(), ["devices"])
+			const names = execFileSync(getAdbPath(), ["devices"], { timeout: this.discoveryTimeout, ...(this.discoveryTimeout ? { killSignal: "SIGKILL" as const } : {}) })
 				.toString()
 				.split("\n")
 				.map(line => line.trim())
@@ -600,7 +602,7 @@ export class AndroidDeviceManager {
 
 	public getConnectedDevicesWithDetails(): Array<AndroidDevice & { version: string, name: string }> {
 		try {
-			const names = execFileSync(getAdbPath(), ["devices"])
+			const names = execFileSync(getAdbPath(), ["devices"], { timeout: this.discoveryTimeout, ...(this.discoveryTimeout ? { killSignal: "SIGKILL" as const } : {}) })
 				.toString()
 				.split("\n")
 				.map(line => line.trim())
